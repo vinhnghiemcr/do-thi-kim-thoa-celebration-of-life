@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100">
+  <rect width="1600" height="1100" fill="#f1e6da"/>
+  <rect x="50" y="50" width="1500" height="1000" rx="30" fill="#fff8f1" stroke="#c7b29b"/>
+  <path d="M300 810h1000" stroke="#b79d85" stroke-width="5" stroke-opacity="0.35"/>
+  <path d="M560 770c50-180 132-282 240-282 114 0 186 100 242 282" fill="#e6d4c1"/>
+  <text x="800" y="870" text-anchor="middle" fill="#6f6256" font-family="Georgia, serif" font-size="52" letter-spacing="5">DAY 2 HIGHLIGHT</text>
+  <text x="800" y="935" text-anchor="middle" fill="#9a7e66" font-family="Arial, sans-serif" font-size="24" letter-spacing="4">main service image</text>
+</svg>

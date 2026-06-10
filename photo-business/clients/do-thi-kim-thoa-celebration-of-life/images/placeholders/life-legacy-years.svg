@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100">
+  <rect width="1600" height="1100" fill="#f6eee5"/>
+  <rect x="46" y="46" width="1508" height="1008" rx="30" fill="#fff9f2" stroke="#c8b39d"/>
+  <path d="M220 760c190-320 438-420 590-420 228 0 420 136 570 420" fill="#eadbcb"/>
+  <circle cx="805" cy="320" r="140" fill="#ebdfd1"/>
+  <text x="800" y="790" text-anchor="middle" fill="#6f6256" font-family="Georgia, serif" font-size="54" letter-spacing="5">LEGACY YEARS PHOTO</text>
+  <text x="800" y="860" text-anchor="middle" fill="#9a7e66" font-family="Arial, sans-serif" font-size="24" letter-spacing="4">later years, grandchildren, or final portrait</text>
+</svg>

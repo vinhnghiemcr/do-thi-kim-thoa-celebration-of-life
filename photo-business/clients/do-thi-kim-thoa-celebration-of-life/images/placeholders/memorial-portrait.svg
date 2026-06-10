@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" role="img" aria-labelledby="title desc">
+  <title id="title">Memorial portrait placeholder</title>
+  <desc id="desc">A warm editorial memorial placeholder for the main portrait image.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f7efe6"/>
+      <stop offset="100%" stop-color="#ddc8b3"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="28%" r="52%">
+      <stop offset="0%" stop-color="#fff9f2" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#fff9f2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="1600" fill="url(#bg)"/>
+  <rect x="70" y="70" width="1060" height="1460" rx="28" fill="none" stroke="#9e856b" stroke-opacity="0.35"/>
+  <circle cx="600" cy="420" r="320" fill="url(#glow)"/>
+  <path d="M340 1120c38-176 146-272 260-272 112 0 225 96 260 272" fill="#eadbcb" stroke="#907760" stroke-opacity="0.3"/>
+  <circle cx="600" cy="640" r="170" fill="#ecdfd0" stroke="#907760" stroke-opacity="0.28"/>
+  <path d="M494 620c18-42 58-74 106-74 52 0 92 32 106 74" fill="none" stroke="#8a7158" stroke-opacity="0.3" stroke-width="8" stroke-linecap="round"/>
+  <path d="M448 1270h304" stroke="#8a7158" stroke-opacity="0.32" stroke-width="2"/>
+  <text x="600" y="1224" text-anchor="middle" fill="#6f6256" font-family="Georgia, serif" font-size="42" letter-spacing="5">PLACE MEMORIAL PORTRAIT HERE</text>
+  <text x="600" y="1296" text-anchor="middle" fill="#8a7158" font-family="Arial, sans-serif" font-size="24" letter-spacing="4">replace with the family's chosen photo</text>
+</svg>

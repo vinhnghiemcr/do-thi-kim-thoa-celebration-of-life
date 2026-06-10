@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100">
+  <rect width="1600" height="1100" fill="#efe6dc"/>
+  <rect x="48" y="48" width="1504" height="1004" rx="30" fill="#fffaf5" stroke="#c8b39d"/>
+  <circle cx="360" cy="310" r="120" fill="#e3d1c0"/>
+  <circle cx="550" cy="310" r="120" fill="#eadccd"/>
+  <circle cx="740" cy="310" r="120" fill="#dfc8b1"/>
+  <path d="M300 600c60-120 180-184 320-184 146 0 264 64 320 184" fill="#e9d7c5"/>
+  <text x="800" y="760" text-anchor="middle" fill="#6f6256" font-family="Georgia, serif" font-size="54" letter-spacing="5">FAMILY YEARS PHOTO</text>
+  <text x="800" y="830" text-anchor="middle" fill="#9a7e66" font-family="Arial, sans-serif" font-size="24" letter-spacing="4">marriage, children, community, or faith</text>
+</svg>

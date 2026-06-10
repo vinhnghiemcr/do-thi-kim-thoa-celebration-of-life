@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100">
+  <rect width="1600" height="1100" fill="#efe5da"/>
+  <rect x="50" y="50" width="1500" height="1000" rx="30" fill="#fff8f1" stroke="#c7b29b"/>
+  <path d="M260 740c140-310 320-470 546-470 210 0 386 142 534 470" fill="#e4d3c2"/>
+  <circle cx="760" cy="330" r="110" fill="#f5ece3"/>
+  <text x="800" y="840" text-anchor="middle" fill="#6f6256" font-family="Georgia, serif" font-size="52" letter-spacing="5">DAY 1 HIGHLIGHT</text>
+  <text x="800" y="905" text-anchor="middle" fill="#9a7e66" font-family="Arial, sans-serif" font-size="24" letter-spacing="4">opening atmosphere or arrival moment</text>
+</svg>

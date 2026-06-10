@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">Maria Đỗ Thị Kim Thoa | Celebration of Life</title>
+    <meta id="pageDescription" name="description" content="A memorial website honoring Maria Đỗ Thị Kim Thoa with visitation and funeral schedule information, remembrance, and daily photos.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Forum&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="site-shell">
+        <header class="topbar">
+            <a class="brand" href="#top" aria-label="Go to top">
+                <span class="brand-mark" aria-hidden="true">
+                    <img
+                        src="images/portraits/maria-do-thi-kim-thoa-official-v3.jpg"
+                        alt=""
+                    >
+                </span>
+                <span class="brand-copy">
+                    <strong>Maria Đỗ Thị Kim Thoa</strong>
+                    <span>Celebration of Life</span>
+                </span>
+            </a>
+
+            <div class="topbar-actions">
+                <div class="topbar-mobile-controls">
+                    <button class="menu-toggle" id="menuToggle" type="button" aria-expanded="false" aria-controls="siteNav">
+                        Menu
+                    </button>
+
+                    <div class="language-toggle" id="languageToggle" role="group" aria-label="Language switcher">
+                        <button class="language-button is-active" id="langEn" type="button" data-language="en" aria-pressed="true">EN</button>
+                        <button class="language-button" id="langVi" type="button" data-language="vi" aria-pressed="false">VI</button>
+                    </div>
+                </div>
+
+                <nav class="site-nav" id="siteNav">
+                    <a href="#schedule" id="navSchedule">Schedule</a>
+                    <a href="#life" id="navLife">Her Life</a>
+                    <a href="#updates" id="navUpdates">Daily Photos</a>
+                    <a href="#gallery" id="navGallery">Gallery</a>
+                </nav>
+            </div>
+        </header>
+
+        <main id="top">
+            <section class="hero">
+                <div class="hero-copy reveal">
+                    <p class="eyebrow" id="heroEyebrow">In loving memory</p>
+                    <h1 id="heroName">Maria Đỗ Thị Kim Thoa</h1>
+                    <p class="hero-dates" id="heroDates"></p>
+                    <p class="hero-intro" id="heroIntro"></p>
+
+                    <div class="hero-actions">
+                        <a class="button button-primary" id="heroPrimaryAction" href="#schedule">View Schedule</a>
+                        <a class="button button-secondary" id="heroSecondaryAction" href="#updates">See Daily Photos</a>
+                    </div>
+
+                    <div class="hero-note" id="heroNote"></div>
+                </div>
+
+                <div class="hero-media frame reveal">
+                    <img id="heroImage" src="" alt="Memorial portrait for Maria Đỗ Thị Kim Thoa">
+                </div>
+            </section>
+
+            <section class="section section-schedule" id="schedule">
+                <div class="section-heading reveal">
+                    <p class="eyebrow" id="scheduleEyebrow">Service schedule</p>
+                    <h2 id="scheduleHeading">Visitation and Funeral Schedule</h2>
+                </div>
+
+                <div class="schedule-grid" id="scheduleGrid"></div>
+            </section>
+
+            <section class="section section-life" id="life">
+                <div class="section-heading reveal">
+                    <p class="eyebrow" id="lifeEyebrow">Her life</p>
+                    <h2 id="lifeHeading">Her Life in Photographs</h2>
+                </div>
+
+                <div class="timeline" id="timeline"></div>
+                <div class="life-story frame reveal" id="lifeStory"></div>
+            </section>
+
+            <section class="section section-updates" id="updates">
+                <div class="section-heading reveal">
+                    <h2 id="updatesHeading">Daily Photos</h2>
+                </div>
+
+                <div class="update-tabs" id="updateTabs" role="tablist" aria-label="Daily photo tabs"></div>
+                <div class="update-panel frame reveal" id="updatePanel"></div>
+            </section>
+
+            <section class="section section-gallery" id="gallery">
+                <div class="section-heading reveal">
+                    <p class="eyebrow" id="galleryEyebrow">Family gallery</p>
+                    <h2 id="galleryHeading">Memorial Gallery</h2>
+                </div>
+
+                <div class="chip-row reveal" id="galleryFilters"></div>
+                <div class="gallery-slideshow frame reveal">
+                    <div class="gallery-stage-panel">
+                        <div class="gallery-stage-shell">
+                            <button class="gallery-arrow gallery-arrow-prev" id="galleryStagePrev" type="button" aria-label="Previous memorial photo">
+                                <span aria-hidden="true">&larr;</span>
+                            </button>
+                            <button
+                                class="gallery-stage"
+                                id="galleryStage"
+                                type="button"
+                                data-gallery-source="slideshow"
+                                aria-label="Open memorial slideshow image"
+                            >
+                                <img id="galleryStageImage" src="" alt="">
+                            </button>
+                            <button class="gallery-arrow gallery-arrow-next" id="galleryStageNext" type="button" aria-label="Next memorial photo">
+                                <span aria-hidden="true">&rarr;</span>
+                            </button>
+                        </div>
+
+                        <div class="gallery-stage-controls">
+                            <button class="gallery-control" id="galleryPrev" type="button">Prev</button>
+                            <button class="gallery-control" id="galleryToggle" type="button" aria-pressed="false">Pause</button>
+                            <button class="gallery-control" id="galleryNext" type="button">Next</button>
+                            <span class="gallery-stage-counter" id="galleryStageCounter"></span>
+                        </div>
+
+                        <div class="gallery-progress" aria-hidden="true">
+                            <span id="galleryProgressBar"></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="lightbox" id="lightbox" aria-hidden="true">
+        <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Close image viewer">Close</button>
+        <button class="lightbox-nav lightbox-prev" id="lightboxPrev" type="button" aria-label="Previous image">
+            <span aria-hidden="true">&larr;</span>
+        </button>
+        <figure class="lightbox-figure">
+            <img id="lightboxImage" src="" alt="">
+            <figcaption>
+                <p class="lightbox-meta" id="lightboxMeta"></p>
+                <p class="lightbox-caption" id="lightboxCaption"></p>
+            </figcaption>
+        </figure>
+        <button class="lightbox-nav lightbox-next" id="lightboxNext" type="button" aria-label="Next image">
+            <span aria-hidden="true">&rarr;</span>
+        </button>
+    </div>
+
+    <script src="data/google-photos-gallery.js"></script>
+    <script src="data/site-data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

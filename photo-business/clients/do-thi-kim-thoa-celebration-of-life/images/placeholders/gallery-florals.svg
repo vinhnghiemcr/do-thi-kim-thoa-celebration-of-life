@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+  <rect width="1200" height="900" fill="#f6efe6"/>
+  <rect x="36" y="36" width="1128" height="828" rx="28" fill="#fffaf5" stroke="#ccb8a3"/>
+  <circle cx="360" cy="370" r="86" fill="#eadbcc"/>
+  <circle cx="520" cy="310" r="86" fill="#e2cfbe"/>
+  <circle cx="660" cy="380" r="86" fill="#efdfd1"/>
+  <text x="600" y="560" text-anchor="middle" fill="#6f6256" font-family="Georgia, serif" font-size="46" letter-spacing="5">DETAILS</text>
+  <text x="600" y="625" text-anchor="middle" fill="#9a7e66" font-family="Arial, sans-serif" font-size="22" letter-spacing="4">flowers, framed portraits, or objects</text>
+</svg>
