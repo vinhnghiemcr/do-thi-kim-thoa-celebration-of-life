@@ -751,7 +751,7 @@ button {
     background:
         radial-gradient(circle at top, rgba(255,255,255,0.38), transparent 36%),
         linear-gradient(180deg, rgba(138, 113, 88, 0.16), rgba(35, 29, 25, 0.08));
-    cursor: pointer;
+    cursor: zoom-in;
 }
 
 .gallery-stage.is-landscape {
@@ -1017,8 +1017,20 @@ button {
     background: rgba(255,255,255,0.08);
     color: #f8efe6;
     border-radius: 999px;
-    padding: 0.9rem 1rem;
+    padding: 0.75rem;
     cursor: pointer;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+}
+
+.lightbox-close svg,
+.lightbox-nav svg {
+    width: 20px;
+    height: 20px;
+    stroke: #f8efe6;
+    stroke-width: 2;
 }
 
 .lightbox-close {

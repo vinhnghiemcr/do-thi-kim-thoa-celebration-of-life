@@ -42,7 +42,6 @@ const galleryStageCounter = document.getElementById("galleryStageCounter");
 const galleryPrev = document.getElementById("galleryPrev");
 const galleryToggle = document.getElementById("galleryToggle");
 const galleryNext = document.getElementById("galleryNext");
-const galleryFullscreen = document.getElementById("galleryFullscreen");
 const galleryStagePrev = document.getElementById("galleryStagePrev");
 const galleryStageNext = document.getElementById("galleryStageNext");
 const galleryProgressBar = document.getElementById("galleryProgressBar");
@@ -161,7 +160,6 @@ function renderChrome() {
     galleryStagePrev.setAttribute("aria-label", getText(siteData.ui.gallery.prev));
     galleryStageNext.setAttribute("aria-label", getText(siteData.ui.gallery.next));
 
-    lightboxClose.textContent = getText(siteData.ui.lightbox.close);
     lightboxClose.setAttribute("aria-label", getText(siteData.ui.lightbox.closeAria));
     lightboxPrev.setAttribute("aria-label", getText(siteData.ui.lightbox.previousAria));
     lightboxNext.setAttribute("aria-label", getText(siteData.ui.lightbox.nextAria));
@@ -588,8 +586,9 @@ function bindGalleryControlEvents() {
             }
 
             if (source === "slideshow") {
-                const items = getFinalGalleryItems();
-                openLightbox(items, currentGalleryIndex);
+                toggleGalleryFullscreen().catch((error) => {
+                    console.error("Unable to toggle fullscreen gallery view.", error);
+                });
             }
         });
     });
@@ -621,21 +620,8 @@ function updateGalleryToggleLabel() {
     renderLucideIcons();
 }
 
-function updateGalleryFullscreenLabel() {
-    const fullscreenSupported = Boolean(document.fullscreenEnabled && galleryStage?.requestFullscreen);
-    galleryFullscreen.disabled = !fullscreenSupported;
-    const isFullscreen = document.fullscreenElement === galleryStage;
-    const label = isFullscreen ? "Exit fullscreen" : "Enter fullscreen";
-    galleryFullscreen.innerHTML = `<i data-lucide="${isFullscreen ? "minimize-2" : "maximize-2"}" aria-hidden="true"></i>`;
-    galleryFullscreen.setAttribute("aria-label", label);
-    galleryFullscreen.setAttribute("title", label);
-    galleryFullscreen.setAttribute("aria-pressed", String(isFullscreen));
-    renderLucideIcons();
-}
-
 async function toggleGalleryFullscreen() {
     if (!document.fullscreenEnabled || !galleryStage?.requestFullscreen) {
-        updateGalleryFullscreenLabel();
         return;
     }
 
@@ -714,18 +700,12 @@ function bindGallerySlideshowEvents() {
 
         stopGalleryAutoplay();
     });
-    galleryFullscreen.addEventListener("click", () => {
-        toggleGalleryFullscreen().catch((error) => {
-            console.error("Unable to toggle fullscreen gallery view.", error);
-        });
-    });
     galleryStageImage.addEventListener("error", handleGalleryImageError);
     galleryStageBackdrop.addEventListener("error", () => {
         galleryStage.classList.remove("is-landscape");
         galleryStage.classList.add("is-portrait");
         galleryStageBackdrop.src = "";
     });
-    document.addEventListener("fullscreenchange", updateGalleryFullscreenLabel);
 }
 
 function bindTimelineEvents() {
@@ -924,7 +904,6 @@ function renderSite() {
     bindGalleryControlEvents();
     bindTimelineEvents();
     updateGalleryToggleLabel();
-    updateGalleryFullscreenLabel();
     updateRevealVisibility();
     renderLucideIcons();
 
@@ -941,6 +920,7 @@ function init() {
     primeUpdateImages();
     startUpdateRefresh();
     restartGalleryAutoplay();
+    lucide.createIcons();
 }
 
 init();
