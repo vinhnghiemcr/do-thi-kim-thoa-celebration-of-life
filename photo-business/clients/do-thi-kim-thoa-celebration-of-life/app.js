@@ -294,6 +294,25 @@ function getPhotoCountLabel(count) {
     return formatText(siteData.ui.updates.photoCountMany, { count });
 }
 
+function renderLucideIcons() {
+    if (window.lucide?.createIcons) {
+        window.lucide.createIcons();
+    }
+}
+
+function syncUpdateSlideBackgrounds() {
+    updatePanel.querySelectorAll(".update-thumb").forEach((slideEl) => {
+        const img = slideEl.querySelector("img");
+        const photoUrl = img?.currentSrc || img?.src;
+
+        if (!photoUrl) {
+            return;
+        }
+
+        slideEl.style.setProperty("--slide-bg", `url("${photoUrl}")`);
+    });
+}
+
 function renderUpdatePanel() {
     const day = getCurrentUpdate();
     if (!day) {
@@ -345,6 +364,8 @@ function renderUpdatePanel() {
             </div>
         </div>
     `;
+
+    syncUpdateSlideBackgrounds();
 }
 
 function getCurrentUpdate() {
@@ -593,10 +614,11 @@ function moveGallery(direction) {
 
 function updateGalleryToggleLabel() {
     const label = galleryAutoplayEnabled ? getText(siteData.ui.gallery.pause) : getText(siteData.ui.gallery.play);
-    galleryToggle.innerHTML = `<span aria-hidden="true">${galleryAutoplayEnabled ? "⏸" : "▶"}</span>`;
+    galleryToggle.innerHTML = `<i data-lucide="${galleryAutoplayEnabled ? "pause" : "play"}" aria-hidden="true"></i>`;
     galleryToggle.setAttribute("aria-label", label);
     galleryToggle.setAttribute("title", label);
     galleryToggle.setAttribute("aria-pressed", String(!galleryAutoplayEnabled));
+    renderLucideIcons();
 }
 
 function updateGalleryFullscreenLabel() {
@@ -604,10 +626,11 @@ function updateGalleryFullscreenLabel() {
     galleryFullscreen.disabled = !fullscreenSupported;
     const isFullscreen = document.fullscreenElement === galleryStage;
     const label = isFullscreen ? "Exit fullscreen" : "Enter fullscreen";
-    galleryFullscreen.innerHTML = `<span aria-hidden="true">${isFullscreen ? "⤡" : "⛶"}</span>`;
+    galleryFullscreen.innerHTML = `<i data-lucide="${isFullscreen ? "minimize-2" : "maximize-2"}" aria-hidden="true"></i>`;
     galleryFullscreen.setAttribute("aria-label", label);
     galleryFullscreen.setAttribute("title", label);
     galleryFullscreen.setAttribute("aria-pressed", String(isFullscreen));
+    renderLucideIcons();
 }
 
 async function toggleGalleryFullscreen() {
@@ -903,6 +926,7 @@ function renderSite() {
     updateGalleryToggleLabel();
     updateGalleryFullscreenLabel();
     updateRevealVisibility();
+    renderLucideIcons();
 
     if (lightbox.classList.contains("is-open")) {
         updateLightbox();
