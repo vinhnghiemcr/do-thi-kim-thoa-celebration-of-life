@@ -116,7 +116,12 @@
                                 data-gallery-source="slideshow"
                                 aria-label="Open memorial slideshow image"
                             >
-                                <img id="galleryStageImage" src="" alt="">
+                                <div class="gallery-stage-background" aria-hidden="true">
+                                    <img id="galleryStageBackdrop" src="" alt="">
+                                </div>
+                                <div class="gallery-stage-foreground">
+                                    <img id="galleryStageImage" src="" alt="">
+                                </div>
                             </button>
                             <button class="gallery-arrow gallery-arrow-next" id="galleryStageNext" type="button" aria-label="Next memorial photo">
                                 <span aria-hidden="true">&rarr;</span>
@@ -124,9 +129,18 @@
                         </div>
 
                         <div class="gallery-stage-controls">
-                            <button class="gallery-control" id="galleryPrev" type="button">Prev</button>
-                            <button class="gallery-control" id="galleryToggle" type="button" aria-pressed="false">Pause</button>
-                            <button class="gallery-control" id="galleryNext" type="button">Next</button>
+                            <button class="gallery-control gallery-control-icon" id="galleryPrev" type="button" aria-label="Previous memorial photo" title="Previous memorial photo">
+                                <span aria-hidden="true">&#x2039;</span>
+                            </button>
+                            <button class="gallery-control gallery-control-icon" id="galleryToggle" type="button" aria-pressed="false" aria-label="Pause slideshow" title="Pause slideshow">
+                                <span aria-hidden="true">&#x23F8;</span>
+                            </button>
+                            <button class="gallery-control gallery-control-icon" id="galleryNext" type="button" aria-label="Next memorial photo" title="Next memorial photo">
+                                <span aria-hidden="true">&#x203A;</span>
+                            </button>
+                            <button class="gallery-control gallery-control-icon" id="galleryFullscreen" type="button" aria-pressed="false" aria-label="Enter fullscreen" title="Enter fullscreen">
+                                <span aria-hidden="true">&#x26F6;</span>
+                            </button>
                             <span class="gallery-stage-counter" id="galleryStageCounter"></span>
                         </div>
 

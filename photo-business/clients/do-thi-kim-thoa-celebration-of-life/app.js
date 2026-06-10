@@ -36,14 +36,17 @@ const updateTabs = document.getElementById("updateTabs");
 const updatePanel = document.getElementById("updatePanel");
 const galleryFilters = document.getElementById("galleryFilters");
 const galleryStage = document.getElementById("galleryStage");
+const galleryStageBackdrop = document.getElementById("galleryStageBackdrop");
 const galleryStageImage = document.getElementById("galleryStageImage");
 const galleryStageCounter = document.getElementById("galleryStageCounter");
 const galleryPrev = document.getElementById("galleryPrev");
 const galleryToggle = document.getElementById("galleryToggle");
 const galleryNext = document.getElementById("galleryNext");
+const galleryFullscreen = document.getElementById("galleryFullscreen");
 const galleryStagePrev = document.getElementById("galleryStagePrev");
 const galleryStageNext = document.getElementById("galleryStageNext");
 const galleryProgressBar = document.getElementById("galleryProgressBar");
+const galleryStagePanel = galleryStage?.closest(".gallery-stage-panel");
 
 const languageToggle = document.getElementById("languageToggle");
 
@@ -65,6 +68,8 @@ let galleryAutoplayTimer = null;
 let galleryAutoplayEnabled = true;
 let lightboxItems = [];
 let lightboxIndex = 0;
+let galleryStageLoadToken = 0;
+const brokenGallerySources = new Set();
 
 const randomizedFinalGallery = shuffleArray(siteData.finalGallery);
 const updateGalleryState = Object.fromEntries(siteData.dailyUpdates.map((day) => [
@@ -149,8 +154,10 @@ function renderChrome() {
 
     updateTabs.setAttribute("aria-label", getText(siteData.ui.updates.tabAria));
 
-    galleryPrev.textContent = getText(siteData.ui.gallery.prev);
-    galleryNext.textContent = getText(siteData.ui.gallery.next);
+    galleryPrev.setAttribute("aria-label", getText(siteData.ui.gallery.prev));
+    galleryPrev.setAttribute("title", getText(siteData.ui.gallery.prev));
+    galleryNext.setAttribute("aria-label", getText(siteData.ui.gallery.next));
+    galleryNext.setAttribute("title", getText(siteData.ui.gallery.next));
     galleryStagePrev.setAttribute("aria-label", getText(siteData.ui.gallery.prev));
     galleryStageNext.setAttribute("aria-label", getText(siteData.ui.gallery.next));
 
@@ -430,7 +437,10 @@ function renderGallery() {
     const items = getFinalGalleryItems();
 
     if (!items.length) {
+        galleryStage.classList.remove("is-landscape", "is-portrait");
+        galleryStageBackdrop.src = "";
         galleryStageImage.src = "";
+        galleryStageBackdrop.alt = "";
         galleryStageImage.alt = "";
         galleryStageCounter.textContent = "";
         return;
@@ -441,10 +451,42 @@ function renderGallery() {
     }
 
     const activeItem = items[currentGalleryIndex];
+    galleryStage.classList.remove("is-landscape", "is-portrait");
+    galleryStageBackdrop.src = activeItem.src;
     galleryStageImage.src = activeItem.src;
+    galleryStageBackdrop.alt = "";
     galleryStageImage.alt = activeItem.alt;
     galleryStageCounter.textContent = `${currentGalleryIndex + 1} / ${items.length}`;
     galleryStage.setAttribute("aria-label", formatText(siteData.ui.gallery.openStageAria, { title: activeItem.captionTitle }));
+    updateGalleryStageLayout(activeItem.src);
+}
+
+function updateGalleryStageLayout(src) {
+    const loadToken = ++galleryStageLoadToken;
+    const probeImage = new window.Image();
+
+    probeImage.addEventListener("load", () => {
+        if (loadToken !== galleryStageLoadToken || galleryStageImage.src !== probeImage.src) {
+            return;
+        }
+
+        const imageAspectRatio = probeImage.naturalWidth / probeImage.naturalHeight;
+        const isLandscape = imageAspectRatio >= 1.2;
+
+        galleryStage.classList.toggle("is-landscape", isLandscape);
+        galleryStage.classList.toggle("is-portrait", !isLandscape);
+    });
+
+    probeImage.addEventListener("error", () => {
+        if (loadToken !== galleryStageLoadToken) {
+            return;
+        }
+
+        galleryStage.classList.remove("is-landscape");
+        galleryStage.classList.add("is-portrait");
+    });
+
+    probeImage.src = src;
 }
 
 function bindTabEvents() {
@@ -550,8 +592,36 @@ function moveGallery(direction) {
 }
 
 function updateGalleryToggleLabel() {
-    galleryToggle.textContent = galleryAutoplayEnabled ? getText(siteData.ui.gallery.pause) : getText(siteData.ui.gallery.play);
+    const label = galleryAutoplayEnabled ? getText(siteData.ui.gallery.pause) : getText(siteData.ui.gallery.play);
+    galleryToggle.innerHTML = `<span aria-hidden="true">${galleryAutoplayEnabled ? "⏸" : "▶"}</span>`;
+    galleryToggle.setAttribute("aria-label", label);
+    galleryToggle.setAttribute("title", label);
     galleryToggle.setAttribute("aria-pressed", String(!galleryAutoplayEnabled));
+}
+
+function updateGalleryFullscreenLabel() {
+    const fullscreenSupported = Boolean(document.fullscreenEnabled && galleryStage?.requestFullscreen);
+    galleryFullscreen.disabled = !fullscreenSupported;
+    const isFullscreen = document.fullscreenElement === galleryStage;
+    const label = isFullscreen ? "Exit fullscreen" : "Enter fullscreen";
+    galleryFullscreen.innerHTML = `<span aria-hidden="true">${isFullscreen ? "⤡" : "⛶"}</span>`;
+    galleryFullscreen.setAttribute("aria-label", label);
+    galleryFullscreen.setAttribute("title", label);
+    galleryFullscreen.setAttribute("aria-pressed", String(isFullscreen));
+}
+
+async function toggleGalleryFullscreen() {
+    if (!document.fullscreenEnabled || !galleryStage?.requestFullscreen) {
+        updateGalleryFullscreenLabel();
+        return;
+    }
+
+    if (document.fullscreenElement === galleryStage) {
+        await document.exitFullscreen();
+        return;
+    }
+
+    await galleryStage.requestFullscreen();
 }
 
 function resetGalleryProgress() {
@@ -592,6 +662,19 @@ function restartGalleryAutoplay() {
     startGalleryAutoplay();
 }
 
+function handleGalleryImageError() {
+    const activeSrc = galleryStageImage.currentSrc || galleryStageImage.src;
+
+    if (!activeSrc || brokenGallerySources.has(activeSrc)) {
+        return;
+    }
+
+    brokenGallerySources.add(activeSrc);
+    console.warn("Skipping gallery image that failed to load.", activeSrc);
+    renderGalleryFilters();
+    setGalleryIndex(currentGalleryIndex);
+}
+
 function bindGallerySlideshowEvents() {
     galleryPrev.addEventListener("click", () => moveGallery(-1));
     galleryNext.addEventListener("click", () => moveGallery(1));
@@ -608,6 +691,18 @@ function bindGallerySlideshowEvents() {
 
         stopGalleryAutoplay();
     });
+    galleryFullscreen.addEventListener("click", () => {
+        toggleGalleryFullscreen().catch((error) => {
+            console.error("Unable to toggle fullscreen gallery view.", error);
+        });
+    });
+    galleryStageImage.addEventListener("error", handleGalleryImageError);
+    galleryStageBackdrop.addEventListener("error", () => {
+        galleryStage.classList.remove("is-landscape");
+        galleryStage.classList.add("is-portrait");
+        galleryStageBackdrop.src = "";
+    });
+    document.addEventListener("fullscreenchange", updateGalleryFullscreenLabel);
 }
 
 function bindTimelineEvents() {
@@ -701,7 +796,7 @@ function getFinalGalleryItems() {
         ? randomizedFinalGallery
         : randomizedFinalGallery.filter((item) => item.filter === currentGalleryFilter);
 
-    return items.map((item) => ({
+    return items.filter((item) => !brokenGallerySources.has(item.src)).map((item) => ({
         src: item.src,
         thumbSrc: item.thumbSrc,
         alt: getText(item.alt),
@@ -806,6 +901,7 @@ function renderSite() {
     bindGalleryControlEvents();
     bindTimelineEvents();
     updateGalleryToggleLabel();
+    updateGalleryFullscreenLabel();
     updateRevealVisibility();
 
     if (lightbox.classList.contains("is-open")) {

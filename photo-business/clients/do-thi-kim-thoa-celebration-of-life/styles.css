@@ -715,11 +715,14 @@ button {
 }
 
 .gallery-stage {
-    min-height: 28rem;
+    position: relative;
     width: 100%;
+    aspect-ratio: 16 / 9;
     padding: 0;
     border: 0;
     overflow: hidden;
+    display: grid;
+    place-items: center;
     border-radius: var(--radius-lg);
     background:
         radial-gradient(circle at top, rgba(255,255,255,0.38), transparent 36%),
@@ -727,10 +730,82 @@ button {
     cursor: pointer;
 }
 
-.gallery-stage img {
+.gallery-stage.is-landscape {
+    background: linear-gradient(180deg, rgba(255, 251, 247, 0.96), rgba(233, 223, 212, 0.9));
+}
+
+.gallery-stage.is-portrait {
+    background:
+        radial-gradient(circle at top, rgba(255,255,255,0.38), transparent 36%),
+        linear-gradient(180deg, rgba(138, 113, 88, 0.16), rgba(35, 29, 25, 0.08));
+}
+
+.gallery-stage-background,
+.gallery-stage-foreground {
+    position: absolute;
+    inset: 0;
+}
+
+.gallery-stage-background {
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 180ms ease;
+}
+
+.gallery-stage-background::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(35, 29, 25, 0.08), rgba(35, 29, 25, 0.24));
+}
+
+.gallery-stage-background img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transform: scale(1.08);
+    filter: blur(24px) saturate(1.05);
+}
+
+.gallery-stage-foreground {
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    padding: 0;
+}
+
+.gallery-stage-foreground img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 0;
+    box-shadow: 0 18px 40px rgba(35, 29, 25, 0.22);
+}
+
+.gallery-stage.is-portrait .gallery-stage-background {
+    opacity: 1;
+}
+
+.gallery-stage.is-portrait .gallery-stage-foreground img {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center center;
+}
+
+.gallery-stage.is-landscape .gallery-stage-foreground {
+    padding: 0;
+}
+
+.gallery-stage.is-landscape .gallery-stage-foreground img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center center;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 .gallery-arrow {
@@ -791,6 +866,19 @@ button {
     background: rgba(255,255,255,0.62);
     color: var(--ink);
     cursor: pointer;
+}
+
+.gallery-control-icon {
+    min-width: 3.35rem;
+    min-height: 3.35rem;
+    padding: 0;
+    display: grid;
+    place-items: center;
+}
+
+.gallery-control-icon span {
+    font-size: 1.45rem;
+    line-height: 1;
 }
 
 .gallery-stage-counter {
@@ -1067,8 +1155,8 @@ button {
         grid-template-columns: 1fr;
     }
 
-    .gallery-stage {
-        min-height: 21rem;
+    .gallery-stage-foreground {
+        padding: 0;
     }
 
     .lightbox {
