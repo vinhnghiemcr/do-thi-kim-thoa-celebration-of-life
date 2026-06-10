@@ -853,7 +853,7 @@ button {
     color: #ffffff;
     backdrop-filter: blur(12px);
     cursor: pointer;
-    z-index: 1;
+    z-index: 51;
 }
 
 .gallery-arrow span,
@@ -905,18 +905,18 @@ button {
 .gallery-control {
     padding: 0.82rem 1rem;
     border-radius: 999px;
-    border: 1px solid var(--line-strong);
-    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(35, 29, 25, 0.35);
+    background: rgba(35, 29, 25, 0.12);
     color: var(--ink);
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(35, 29, 25, 0.1);
+    box-shadow: 0 2px 8px rgba(35, 29, 25, 0.12);
 }
 
 .gallery-control svg {
     width: 20px;
     height: 20px;
     stroke: var(--ink);
-    stroke-width: 2;
+    stroke-width: 2.5;
 }
 
 .gallery-control-icon {
@@ -931,20 +931,20 @@ button {
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.3);
     background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
+    color: var(--ink);
     backdrop-filter: blur(4px);
 }
 
 .gallery-control-icon:hover,
 .gallery-control-icon:focus-visible {
     background: rgba(255, 255, 255, 0.24);
-    color: #ffffff;
+    color: var(--ink);
 }
 
 .gallery-control-icon svg {
     width: 18px;
     height: 18px;
-    stroke: #ffffff;
+    stroke: var(--ink);
     stroke-width: 2;
 }
 
@@ -1276,7 +1276,67 @@ button {
         left: 0.75rem;
     }
 
-    .gallery-arrow-next {
+.gallery-arrow-next {
         right: 0.75rem;
     }
+}
+
+/* iOS Safari fullscreen fallback */
+.gallery-stage.is-expanded-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    width: 100vw !important;
+    height: 100dvh !important;
+    aspect-ratio: unset !important;
+    border-radius: 0 !important;
+    background: #000 !important;
+}
+
+body.gallery-overlay-open {
+    overflow: hidden;
+}
+
+/* Show a close hint when in overlay mode */
+.gallery-stage.is-expanded-overlay::after {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E") center/16px no-repeat;
+    border: 1px solid rgba(255,255,255,0.3);
+    z-index: 2;
+    pointer-events: none;
+}
+
+.gallery-stage.is-expanded-overlay ~ .gallery-stage-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 1.5rem;
+    z-index: 52;
+    transform: translateX(-50%);
+    padding: 0.65rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(17, 14, 12, 0.18);
+    backdrop-filter: blur(12px);
+}
+
+.gallery-stage.is-expanded-overlay ~ .gallery-stage-controls .gallery-control {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: none;
+}
+
+.gallery-stage.is-expanded-overlay ~ .gallery-stage-controls .gallery-control,
+.gallery-stage.is-expanded-overlay ~ .gallery-stage-controls .gallery-control-icon,
+.gallery-stage.is-expanded-overlay ~ .gallery-stage-controls .gallery-stage-counter {
+    color: #ffffff;
+}
+
+.gallery-stage.is-expanded-overlay ~ .gallery-stage-controls .gallery-control svg,
+.gallery-stage.is-expanded-overlay ~ .gallery-stage-controls .gallery-control-icon svg {
+    stroke: #ffffff;
 }

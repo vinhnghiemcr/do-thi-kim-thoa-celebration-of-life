@@ -621,16 +621,14 @@ function updateGalleryToggleLabel() {
 }
 
 async function toggleGalleryFullscreen() {
-    if (!document.fullscreenEnabled || !galleryStage?.requestFullscreen) {
-        return;
+    const isExpanded = galleryStage.classList.contains("is-expanded-overlay");
+    if (isExpanded) {
+        galleryStage.classList.remove("is-expanded-overlay");
+        document.body.classList.remove("gallery-overlay-open");
+    } else {
+        galleryStage.classList.add("is-expanded-overlay");
+        document.body.classList.add("gallery-overlay-open");
     }
-
-    if (document.fullscreenElement === galleryStage) {
-        await document.exitFullscreen();
-        return;
-    }
-
-    await galleryStage.requestFullscreen();
 }
 
 function resetGalleryProgress() {
