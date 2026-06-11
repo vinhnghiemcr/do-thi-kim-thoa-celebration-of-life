@@ -34,6 +34,10 @@ const timeline = document.getElementById("timeline");
 const lifeStory = document.getElementById("lifeStory");
 const updateTabs = document.getElementById("updateTabs");
 const updatePanel = document.getElementById("updatePanel");
+const galleryContribute = document.getElementById("galleryContribute");
+const galleryContributeCopy = document.getElementById("galleryContributeCopy");
+const galleryContributeBtn = document.getElementById("galleryContributeBtn");
+const galleryContributeLabel = document.getElementById("galleryContributeLabel");
 const galleryFilters = document.getElementById("galleryFilters");
 const galleryStage = document.getElementById("galleryStage");
 const galleryStageBackdrop = document.getElementById("galleryStageBackdrop");
@@ -48,6 +52,11 @@ const galleryProgressBar = document.getElementById("galleryProgressBar");
 const galleryStagePanel = galleryStage?.closest(".gallery-stage-panel");
 
 const languageToggle = document.getElementById("languageToggle");
+
+const updateModal = document.getElementById("updateModal");
+const updateModalStage = document.getElementById("updateModalStage");
+const updateModalThumbStrip = document.getElementById("updateModalThumbStrip");
+const updateModalClose = document.getElementById("updateModalClose");
 
 const lightbox = document.getElementById("lightbox");
 const lightboxImage = document.getElementById("lightboxImage");
@@ -73,6 +82,7 @@ let galleryAutoplayEnabled = true;
 let lightboxItems = [];
 let lightboxIndex = 0;
 let lightboxMode = "default";
+let updateModalOpen = false;
 let galleryStageLoadToken = 0;
 const brokenGallerySources = new Set();
 
@@ -85,6 +95,7 @@ const updateGalleryState = Object.fromEntries(siteData.dailyUpdates.map((day) =>
         loadedAt: 0
     }
 ]));
+const updateSelectedImageIndex = Object.fromEntries(siteData.dailyUpdates.map((day) => [day.id, 0]));
 
 const UPDATE_REFRESH_MS = 60 * 1000;
 
@@ -166,6 +177,9 @@ function renderChrome() {
     galleryStagePrev.setAttribute("aria-label", getText(siteData.ui.gallery.prev));
     galleryStageNext.setAttribute("aria-label", getText(siteData.ui.gallery.next));
 
+    if (updateModalClose) {
+        updateModalClose.setAttribute("aria-label", getText(siteData.ui.lightbox.closeUpdateAria));
+    }
     lightboxClose.setAttribute("aria-label", getText(siteData.ui.lightbox.closeAria));
     lightboxPrev.setAttribute("aria-label", getText(siteData.ui.lightbox.previousAria));
     lightboxNext.setAttribute("aria-label", getText(siteData.ui.lightbox.nextAria));
@@ -177,6 +191,24 @@ function renderLanguageToggle() {
         button.classList.toggle("is-active", isActive);
         button.setAttribute("aria-pressed", String(isActive));
     });
+}
+
+function renderGalleryContribution() {
+    const contribution = siteData.galleryContribution;
+    const hasUrl = Boolean(contribution?.url);
+
+    galleryContribute.hidden = !hasUrl;
+    if (!hasUrl) {
+        galleryContributeCopy.textContent = "";
+        galleryContributeBtn.setAttribute("href", "#");
+        galleryContributeBtn.setAttribute("aria-hidden", "true");
+        return;
+    }
+
+    galleryContributeCopy.textContent = getText(contribution.copy) || getText(siteData.ui.gallery.contributeCopy);
+    galleryContributeLabel.textContent = getText(contribution.label) || getText(siteData.ui.gallery.contributeLabel);
+    galleryContributeBtn.setAttribute("href", contribution.url);
+    galleryContributeBtn.removeAttribute("aria-hidden");
 }
 
 function setHero() {
@@ -305,7 +337,7 @@ function renderLucideIcons() {
 }
 
 function syncUpdateSlideBackgrounds() {
-    updatePanel.querySelectorAll(".update-thumb").forEach((slideEl) => {
+    updatePanel.querySelectorAll(".update-thumb-item, .update-main-frame, .update-modal-main-frame").forEach((slideEl) => {
         const img = slideEl.querySelector("img");
         const photoUrl = img?.currentSrc || img?.src;
 
@@ -315,6 +347,48 @@ function syncUpdateSlideBackgrounds() {
 
         slideEl.style.setProperty("--slide-bg", `url("${photoUrl}")`);
     });
+}
+
+function getSelectedUpdateImageIndex(updateId) {
+    const images = getUpdateImages(updateId);
+
+    if (!images.length) {
+        updateSelectedImageIndex[updateId] = 0;
+        return 0;
+    }
+
+    const currentIndex = Number(updateSelectedImageIndex[updateId] || 0);
+    const safeIndex = Math.min(Math.max(currentIndex, 0), images.length - 1);
+    updateSelectedImageIndex[updateId] = safeIndex;
+    return safeIndex;
+}
+
+function setSelectedUpdateImageIndex(updateId, index) {
+    const images = getUpdateImages(updateId);
+    if (!images.length) {
+        updateSelectedImageIndex[updateId] = 0;
+        return;
+    }
+
+    updateSelectedImageIndex[updateId] = Math.min(Math.max(index, 0), images.length - 1);
+}
+
+function buildUpdateStageMarkup(image, index, total, title, className) {
+    return `
+        <button
+            class="${className}"
+            type="button"
+            aria-label="${formatText(siteData.ui.updates.mainFrameAria, { title })}"
+        >
+            <div class="update-main-background" aria-hidden="true">
+                <img src="${image.src}" alt="">
+            </div>
+            <div class="update-main-foreground">
+                <img src="${image.src}" alt="${image.alt}">
+            </div>
+            <span class="update-main-counter">${index + 1} / ${total}</span>
+        </button>
+    `;
 }
 
 function renderUpdatePanel() {
@@ -328,6 +402,9 @@ function renderUpdatePanel() {
     const isLoading = status === "loading";
     const hasImages = images.length > 0;
     const dayTitle = getText(day.title);
+    const selectedIndex = getSelectedUpdateImageIndex(day.id);
+    const selectedImage = images[selectedIndex];
+    const hasContributeUrl = Boolean(day.contributeUrl);
 
     updatePanel.innerHTML = `
         <div class="update-header reveal">
@@ -338,19 +415,31 @@ function renderUpdatePanel() {
                 <div class="update-summary-copy">
                     <p>${getText(day.summary)}</p>
                 </div>
+                ${hasContributeUrl ? `
+                    <div class="update-contribute">
+                        <p class="update-contribute-copy">${getText(siteData.ui.updates.contributeCopy)}</p>
+                        <a class="update-contribute-btn" href="${day.contributeUrl}" target="_blank" rel="noreferrer">
+                            <span>${getText(siteData.ui.updates.contributeLabel)}</span>
+                            <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+                        </a>
+                    </div>
+                ` : ""}
             </div>
         </div>
         <div class="update-photo-card reveal">
             ${hasImages ? `
-                <div class="update-grid" aria-label="${formatText(siteData.ui.updates.gridAria, { title: dayTitle })}">
+                <div class="update-viewer">
+                    ${buildUpdateStageMarkup(selectedImage, selectedIndex, images.length, dayTitle, "update-main-frame")}
+                </div>
+                <div class="update-thumb-strip" id="updateThumbStrip" aria-label="${formatText(siteData.ui.updates.thumbStripAria, { title: dayTitle })}">
                     ${images.map((image, index) => `
                         <button
-                            class="update-thumb"
+                            class="update-thumb-item ${index === selectedIndex ? "is-selected" : ""}"
                             type="button"
-                            data-gallery-source="updates"
-                            data-update-id="${day.id}"
+                            data-update-thumb="true"
                             data-image-index="${index}"
                             aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
+                            aria-pressed="${index === selectedIndex ? "true" : "false"}"
                         >
                             <img src="${image.src}" alt="${image.alt}">
                         </button>
@@ -370,6 +459,8 @@ function renderUpdatePanel() {
     `;
 
     syncUpdateSlideBackgrounds();
+    renderUpdateModal();
+    bindUpdatePanelEvents();
 }
 
 function getCurrentUpdate() {
@@ -388,6 +479,42 @@ function getUpdateGalleryStatus(updateId) {
     return getUpdateGalleryState(updateId).status;
 }
 
+function renderUpdateModal() {
+    const day = getCurrentUpdate();
+    if (!day || !updateModalStage || !updateModalThumbStrip) {
+        return;
+    }
+
+    const images = getUpdateImages(day.id);
+    const dayTitle = getText(day.title);
+
+    if (!images.length) {
+        updateModalStage.innerHTML = "";
+        updateModalThumbStrip.innerHTML = "";
+        return;
+    }
+
+    const selectedIndex = getSelectedUpdateImageIndex(day.id);
+    const selectedImage = images[selectedIndex];
+
+    updateModalStage.innerHTML = buildUpdateStageMarkup(selectedImage, selectedIndex, images.length, dayTitle, "update-modal-main-frame");
+    updateModalThumbStrip.innerHTML = images.map((image, index) => `
+        <button
+            class="update-thumb-item ${index === selectedIndex ? "is-selected" : ""}"
+            type="button"
+            data-update-modal-thumb="true"
+            data-image-index="${index}"
+            aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
+            aria-pressed="${index === selectedIndex ? "true" : "false"}"
+        >
+            <img src="${image.src}" alt="${image.alt}">
+        </button>
+    `).join("");
+
+    syncUpdateSlideBackgrounds();
+    bindUpdateModalEvents();
+}
+
 function shouldRefreshUpdateImages(updateId) {
     const state = getUpdateGalleryState(updateId);
     return !state.loadedAt || Date.now() - state.loadedAt >= UPDATE_REFRESH_MS;
@@ -397,7 +524,7 @@ async function fetchUpdateImages(updateId, { force = false } = {}) {
     const day = siteData.dailyUpdates.find((entry) => entry.id === updateId);
     const state = getUpdateGalleryState(updateId);
 
-    if (!day?.folderId || state.status === "loading" || (!force && state.status === "ready" && !shouldRefreshUpdateImages(updateId))) {
+    if ((!day?.folderId && !day?.albumUrl) || state.status === "loading" || (!force && state.status === "ready" && !shouldRefreshUpdateImages(updateId))) {
         return;
     }
 
@@ -409,7 +536,10 @@ async function fetchUpdateImages(updateId, { force = false } = {}) {
     }
 
     try {
-        const response = await fetch(`/api/funeral-day-gallery?folderId=${encodeURIComponent(day.folderId)}`, {
+        const query = day.albumUrl
+            ? `albumUrl=${encodeURIComponent(day.albumUrl)}`
+            : `folderId=${encodeURIComponent(day.folderId)}`;
+        const response = await fetch(`/api/funeral-day-gallery?${query}`, {
             cache: "no-store"
         });
 
@@ -421,11 +551,13 @@ async function fetchUpdateImages(updateId, { force = false } = {}) {
         state.images = Array.isArray(payload.images) ? payload.images : [];
         state.status = "ready";
         state.loadedAt = Date.now();
+        getSelectedUpdateImageIndex(updateId);
     } catch (error) {
         state.images = [];
         state.status = "error";
         state.loadedAt = Date.now();
         console.error("Unable to load daily photos", day.id, error);
+        updateSelectedImageIndex[updateId] = 0;
     }
 
     if (currentUpdateId === updateId) {
@@ -521,8 +653,6 @@ function bindTabEvents() {
             renderUpdateTabs();
             renderUpdatePanel();
             bindTabEvents();
-            bindGalleryControlEvents();
-            bindTimelineEvents();
             updateRevealVisibility();
             fetchUpdateImages(currentUpdateId).catch((error) => {
                 console.error("Unable to refresh daily photo folder", currentUpdateId, error);
@@ -577,20 +707,6 @@ function bindGalleryControlEvents() {
         button.dataset.boundClick = "true";
         button.addEventListener("click", () => {
             const source = button.dataset.gallerySource;
-            if (source === "updates") {
-                const items = getUpdateLightboxItems(button.dataset.updateId);
-                const imageIndex = Number(button.dataset.imageIndex);
-                openLightbox(items, imageIndex);
-                return;
-            }
-
-            if (source === "final") {
-                const items = getFinalGalleryItems();
-                const imageIndex = Number(button.dataset.imageIndex);
-                openLightbox(items, imageIndex);
-                return;
-            }
-
             if (source === "slideshow") {
                 const items = getFinalGalleryItems();
                 openLightbox(items, currentGalleryIndex, { mode: "slideshow" });
@@ -721,23 +837,38 @@ function bindGallerySlideshowEvents() {
     });
 }
 
-function bindTimelineEvents() {
-    document.querySelectorAll(".timeline-media img").forEach((image, index) => {
-        if (image.dataset.boundClick === "true") {
+function bindThumbStripDrag(strip = document.getElementById("updateThumbStrip")) {
+    if (!strip || strip.dataset.boundDrag === "true") {
+        return;
+    }
+
+    strip.dataset.boundDrag = "true";
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    const endDrag = () => {
+        isDown = false;
+        strip.classList.remove("is-dragging");
+    };
+
+    strip.addEventListener("mousedown", (event) => {
+        isDown = true;
+        startX = event.pageX - strip.offsetLeft;
+        scrollLeft = strip.scrollLeft;
+        strip.classList.add("is-dragging");
+    });
+
+    strip.addEventListener("mouseleave", endDrag);
+    strip.addEventListener("mouseup", endDrag);
+    strip.addEventListener("mousemove", (event) => {
+        if (!isDown) {
             return;
         }
 
-        image.dataset.boundClick = "true";
-        image.style.cursor = "pointer";
-        image.addEventListener("click", () => {
-            const items = siteData.lifeChapters.map((chapter) => ({
-                src: chapter.image.src,
-                alt: getText(chapter.image.alt),
-                caption: getText(chapter.caption),
-                meta: getText(chapter.title)
-            }));
-            openLightbox(items, index);
-        });
+        event.preventDefault();
+        const x = event.pageX - strip.offsetLeft;
+        strip.scrollLeft = scrollLeft - (x - startX) * 1.5;
     });
 }
 
@@ -802,18 +933,70 @@ function updateRevealVisibility() {
     });
 }
 
-function getUpdateLightboxItems(updateId) {
-    const day = siteData.dailyUpdates.find((entry) => entry.id === updateId);
-    if (!day) {
-        return [];
+function openUpdateModal() {
+    if (!getUpdateImages(currentUpdateId).length) {
+        return;
     }
 
-    return getUpdateImages(updateId).map((image) => ({
-        src: image.src,
-        alt: image.alt,
-        caption: image.caption,
-        meta: getText(day.title)
-    }));
+    updateModalOpen = true;
+    renderUpdateModal();
+    updateModal.classList.add("is-open");
+    updateModal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeUpdateModal() {
+    updateModalOpen = false;
+    updateModal.classList.remove("is-open");
+    updateModal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = lightbox.classList.contains("is-open") ? "hidden" : "";
+}
+
+function bindUpdatePanelEvents() {
+    const mainFrame = document.querySelector(".update-main-frame");
+    const thumbStrip = document.getElementById("updateThumbStrip");
+
+    mainFrame?.addEventListener("click", openUpdateModal);
+    thumbStrip?.querySelectorAll("[data-update-thumb]").forEach((button) => {
+        button.addEventListener("click", () => {
+            setSelectedUpdateImageIndex(currentUpdateId, Number(button.dataset.imageIndex));
+            renderUpdatePanel();
+            renderLucideIcons();
+            window.setTimeout(() => {
+                const strip = document.getElementById("updateThumbStrip");
+                const selected = strip?.querySelector(".is-selected");
+                if (strip && selected) {
+                    selected.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }
+            }, 50);
+        });
+    });
+
+    bindThumbStripDrag(thumbStrip);
+}
+
+function bindUpdateModalEvents() {
+    updateModalClose?.addEventListener("click", closeUpdateModal);
+    updateModal?.addEventListener("click", (event) => {
+        if (event.target === updateModal) {
+            closeUpdateModal();
+        }
+    });
+
+    updateModalThumbStrip?.querySelectorAll("[data-update-modal-thumb]").forEach((button) => {
+        button.addEventListener("click", () => {
+            setSelectedUpdateImageIndex(currentUpdateId, Number(button.dataset.imageIndex));
+            renderUpdatePanel();
+            renderUpdateModal();
+            renderLucideIcons();
+            window.setTimeout(() => {
+                const selected = updateModalThumbStrip?.querySelector(".is-selected");
+                selected?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+            }, 50);
+        });
+    });
+
+    bindThumbStripDrag(updateModalThumbStrip);
 }
 
 function getFinalGalleryItems() {
@@ -892,6 +1075,26 @@ function bindEvents() {
     });
 
     document.addEventListener("keydown", (event) => {
+        if (updateModalOpen) {
+            if (event.key === "Escape") {
+                closeUpdateModal();
+            }
+
+            if (event.key === "ArrowLeft") {
+                setSelectedUpdateImageIndex(currentUpdateId, getSelectedUpdateImageIndex(currentUpdateId) - 1);
+                renderUpdatePanel();
+                renderLucideIcons();
+            }
+
+            if (event.key === "ArrowRight") {
+                setSelectedUpdateImageIndex(currentUpdateId, getSelectedUpdateImageIndex(currentUpdateId) + 1);
+                renderUpdatePanel();
+                renderLucideIcons();
+            }
+
+            return;
+        }
+
         if (!lightbox.classList.contains("is-open")) {
             if (event.key === "ArrowLeft") {
                 moveGallery(-1);
@@ -932,15 +1135,19 @@ function renderSite() {
     renderLifeStory();
     renderUpdateTabs();
     renderUpdatePanel();
+    renderGalleryContribution();
     renderGalleryFilters();
     renderGallery();
     bindTabEvents();
     bindFilterEvents();
     bindGalleryControlEvents();
-    bindTimelineEvents();
     updateGalleryToggleLabel();
     updateRevealVisibility();
     renderLucideIcons();
+
+    if (updateModalOpen) {
+        renderUpdateModal();
+    }
 
     if (lightbox.classList.contains("is-open")) {
         updateLightbox();

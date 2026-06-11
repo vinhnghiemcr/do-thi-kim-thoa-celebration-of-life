@@ -147,8 +147,26 @@
                         </div>
                     </div>
                 </div>
+                <div class="gallery-contribute reveal" id="galleryContribute" hidden>
+                    <p class="gallery-contribute-copy" id="galleryContributeCopy"></p>
+                    <a class="gallery-contribute-btn" id="galleryContributeBtn" href="#" target="_blank" rel="noreferrer">
+                        <span id="galleryContributeLabel">Add a Photo</span>
+                        <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+                    </a>
+                </div>
             </section>
         </main>
+    </div>
+
+    <div class="update-modal" id="updateModal" aria-hidden="true">
+        <div class="update-modal-dialog">
+            <button class="update-modal-close" id="updateModalClose" type="button" aria-label="Close daily photos viewer">
+                <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+
+            <div class="update-modal-stage" id="updateModalStage"></div>
+            <div class="update-modal-thumb-strip" id="updateModalThumbStrip" aria-label="Daily photo thumbnails in fullscreen view"></div>
+        </div>
     </div>
 
     <div class="lightbox" id="lightbox" aria-hidden="true">

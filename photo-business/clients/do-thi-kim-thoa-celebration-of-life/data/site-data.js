@@ -102,9 +102,25 @@ window.memorialSiteData = {
                 en: "Daily photo tabs",
                 vi: "Các ngày hình ảnh"
             },
+            mainFrameAria: {
+                en: "Open fullscreen daily photos for {title}",
+                vi: "Mở toàn màn hình hình ảnh hằng ngày cho {title}"
+            },
+            thumbStripAria: {
+                en: "Daily photo thumbnails for {title}",
+                vi: "Dải ảnh thu nhỏ hằng ngày cho {title}"
+            },
             photoKicker: {
                 en: "Daily Photos",
                 vi: "Hình ảnh hằng ngày"
+            },
+            contributeCopy: {
+                en: "Have photos from this day? Add them to the family collection here.",
+                vi: "Nếu quý vị có hình ảnh của ngày này, xin thêm vào bộ sưu tập của gia đình tại đây."
+            },
+            contributeLabel: {
+                en: "Add a Photo",
+                vi: "Thêm Hình Ảnh"
             },
             emptyTitleLoading: {
                 en: "Loading photos...",
@@ -163,6 +179,14 @@ window.memorialSiteData = {
             openStageAria: {
                 en: "Open memorial slideshow image: {title}",
                 vi: "Mở ảnh trình chiếu tưởng niệm: {title}"
+            },
+            contributeCopy: {
+                en: "Have memorial photos to share? Add them to the family gallery here.",
+                vi: "Nếu quý vị có ảnh tưởng niệm muốn chia sẻ, xin thêm vào thư viện gia đình tại đây."
+            },
+            contributeLabel: {
+                en: "Add a Photo",
+                vi: "Thêm Hình Ảnh"
             }
         },
         lightbox: {
@@ -181,6 +205,10 @@ window.memorialSiteData = {
             nextAria: {
                 en: "Next image",
                 vi: "Ảnh tiếp theo"
+            },
+            closeUpdateAria: {
+                en: "Close daily photos viewer",
+                vi: "Đóng trình xem hình ảnh hằng ngày"
             },
             counter: {
                 en: "{current} / {total} · {meta}",
@@ -442,7 +470,7 @@ window.memorialSiteData = {
                 "Vào tháng 11 năm 1990, bà Thoa cùng gia đình định cư tại Hoa Kỳ, trước tiên sống tại Harvey, Louisiana, rồi sau đó lập nghiệp ở Arlington, Texas, nơi bà gắn bó trong 35 năm tiếp theo. Sau khi đến Mỹ, bà làm nghề may và về sau mở dịch vụ giữ trẻ tại nhà, chăm sóc biết bao trẻ nhỏ trước khi nghỉ hưu.",
                 "Là một người Công giáo hết lòng sốt mến, bà Thoa gắn bó sâu đậm với cộng đoàn giáo xứ và nhiều đoàn thể trong Giáo hội, thường đảm nhận những vai trò lãnh đạo. Đức tin của bà được thể hiện qua việc làm và lòng quảng đại. Bà tận hiến cho những công việc bác ái gần gũi với trái tim mình, như giúp đỡ người nghèo và người đau yếu, hỗ trợ việc học nghề, bảo trợ các linh mục và nữ tu, cũng như đóng góp cho công cuộc truyền giáo tại Hoa Kỳ, Việt Nam và nhiều nơi khác.",
                 "Trên hết, bà Thoa là người vợ, người mẹ, người bà, người chị em, và người bạn đầy yêu thương. Niềm vui lớn nhất của bà là chăm lo cho gia đình và vui mừng trước những thành quả của người thân. Sức mạnh, lòng nhân hậu, sự khôn ngoan, và đức tin bền vững của bà đã chạm đến tất cả những ai quen biết bà, và sẽ còn là một di sản lâu bền cho nhiều thế hệ mai sau.",
-                "Bà để lại người chồng yêu quý đã gắn bó hơn 53 năm là ông Alphonse Hoàng Dương Kiểm; người con gái Hằng Hoàng và chồng là Khoi Tran cùng bốn người con trai là Paul, Joseph, John, và James; người con gái Trâm Hoàng và chồng là Uyen Vu cùng hai con gái là Kayla và Evelyn; hai người con gái Mai Hoàng và Thúy Hoàng; người con trai Thiện Hoàng và vợ là Tina Truong cùng hai người con là Evan và Emery; người anh ruột là Đỗ Đình Chương; cùng nhiều cháu, họ hàng, thân quyến, và bạn hữu thương mến tại Hoa Kỳ và Việt Nam.",
+                "Bà để lại người chồng yêu quý đã gắn bó hơn 53 năm là ông Alphonse Hoàng Dương Kiểm; người con gái Hoàng Thanh Hằng và chồng là Trần Văn Khôi cùng bốn người con trai là Khoa, Khiêm, Thành, và Thịnh; người con gái Hoàng Quỳnh Trâm và chồng là Vũ Trần Thế Uyên cùng hai con gái là Yến và Linh Trân; hai người con gái Hoàng Mai Anh và Hoàng Mộng Thúy; người con trai Hoàng Dương Thiện và vợ là Trương Nguyễn Thoại Châu cùng hai người con là Evan và Emery; người anh ruột là Đỗ Đình Chương; cùng nhiều cháu, họ hàng, thân quyến, và bạn hữu thương mến tại Hoa Kỳ và Việt Nam.",
                 "Bà Thoa đã được đoàn tụ với cha mẹ là ông Đỗ Văn Phi và bà Nguyễn Thị Nganh, cùng người chị gái và bốn người anh trai đã qua đời trước bà.",
                 "Dù bà sẽ được nhớ thương sâu sắc, gia đình tìm thấy niềm an ủi khi biết rằng bà đã sống một cuộc đời của đức tin, phục vụ, hy sinh, và yêu thương. Ký ức về bà sẽ mãi còn trong trái tim của tất cả những ai từng được diễm phúc biết đến bà."
             ]
@@ -455,6 +483,17 @@ window.memorialSiteData = {
                 vi: "Thư mục hình ảnh hằng ngày"
             },
             url: "https://drive.google.com/drive/folders/1jN5EnhVgIAf1aQHL5tWenUL5T5WQzM9z"
+        }
+    },
+    galleryContribution: {
+        url: "https://photos.google.com/u/1/share/AF1QipNY41unK8UGTl883_zAZqInVm7eiNP3sA7Ja1udirWi4zb8cmrpccsLStx5n8Qp7Q?pli=1&key=T0FQYWFoVGpFUXJsRk5YZ1d2VmUxdEtzQUF5VjNn",
+        copy: {
+            en: "Have memorial photos to share? Add them to the family gallery here.",
+            vi: "Nếu quý vị có ảnh tưởng niệm muốn chia sẻ, xin thêm vào thư viện gia đình tại đây."
+        },
+        label: {
+            en: "Add a Photo",
+            vi: "Thêm Hình Ảnh"
         }
     },
     dailyUpdates: [
@@ -487,6 +526,7 @@ window.memorialSiteData = {
                 },
                 url: "https://drive.google.com/drive/folders/1XEYw_liTanq3NfIfKQSgja9-m9QidM5S"
             },
+            contributeUrl: "",
             folderId: "1XEYw_liTanq3NfIfKQSgja9-m9QidM5S",
             images: []
         },
@@ -519,6 +559,7 @@ window.memorialSiteData = {
                 },
                 url: "https://drive.google.com/drive/folders/1U0gfd7EBMTs-BBxnUM27xHtHJyTHRNtT"
             },
+            contributeUrl: "",
             folderId: "1U0gfd7EBMTs-BBxnUM27xHtHJyTHRNtT",
             images: []
         },
@@ -551,7 +592,35 @@ window.memorialSiteData = {
                 },
                 url: "https://drive.google.com/drive/folders/1U4yp0qP35TFGucWGBv6X19fU5AdXGgjr"
             },
+            contributeUrl: "",
             folderId: "1U4yp0qP35TFGucWGBv6X19fU5AdXGgjr",
+            images: []
+        },
+        {
+            id: "vietnam",
+            tabLabel: {
+                en: "Funeral In Vietnam",
+                vi: "Lễ Tang Tại Việt Nam"
+            },
+            date: {
+                en: "Vietnam",
+                vi: "Việt Nam"
+            },
+            title: {
+                en: "Funeral In Vietnam",
+                vi: "Lễ Tang Tại Việt Nam"
+            },
+            subtitle: {
+                en: "Funeral service held in Vietnam",
+                vi: "Lễ tang được tổ chức tại Việt Nam"
+            },
+            summary: {
+                en: "Photos shared by family and friends attending the funeral service in Vietnam.",
+                vi: "Hình ảnh được chia sẻ bởi gia đình và bạn bè tham dự lễ tang tại Việt Nam."
+            },
+            contributeUrl: "https://photos.google.com/u/1/share/AF1QipMK2J1Izjc8q1GKiGePM9vdFJDCvGda7wmHquFyXEB_55L9TNJeygZEXNzlYCBWNg?pli=1&key=REN0RDB0WEg1Tmp1X29BY0t1MkM5d2VJQnktaWhn",
+            albumUrl: "https://photos.google.com/u/1/share/AF1QipMK2J1Izjc8q1GKiGePM9vdFJDCvGda7wmHquFyXEB_55L9TNJeygZEXNzlYCBWNg?pli=1&key=REN0RDB0WEg1Tmp1X29BY0t1MkM5d2VJQnktaWhn",
+            folderId: "",
             images: []
         }
     ],
