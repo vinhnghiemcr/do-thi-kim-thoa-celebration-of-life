@@ -381,14 +381,50 @@ function buildUpdateStageMarkup(image, index, total, title, className) {
             aria-label="${formatText(siteData.ui.updates.mainFrameAria, { title })}"
         >
             <div class="update-main-background" aria-hidden="true">
-                <img src="${image.src}" alt="">
+                <img class="update-main-bg-image" src="${image.src}" alt="">
             </div>
             <div class="update-main-foreground">
-                <img src="${image.src}" alt="${image.alt}">
+                <img class="update-main-img" src="${image.src}" alt="${image.alt}">
             </div>
             <span class="update-main-counter">${index + 1} / ${total}</span>
         </button>
     `;
+}
+
+function updateMainPhoto(images, index) {
+    const image = images[index];
+    if (!image) {
+        return;
+    }
+
+    const mainBg = updatePanel.querySelector(".update-main-bg-image");
+    const mainImg = updatePanel.querySelector(".update-main-img");
+    const counter = updatePanel.querySelector(".update-main-counter");
+
+    if (mainBg) {
+        mainBg.src = image.src;
+    }
+
+    if (mainImg) {
+        mainImg.style.transition = "opacity 0.2s ease";
+        mainImg.style.opacity = "0";
+        mainImg.onload = () => {
+            mainImg.style.opacity = "1";
+            mainImg.onload = null;
+        };
+        mainImg.src = image.src;
+        mainImg.alt = image.alt || "";
+    }
+
+    if (counter) {
+        counter.textContent = `${index + 1} / ${images.length}`;
+    }
+
+    updatePanel.querySelectorAll(".update-thumb-item").forEach((button) => {
+        const isSelected = Number(button.dataset.imageIndex) === index;
+        button.classList.toggle("is-selected", isSelected);
+        button.setAttribute("aria-pressed", String(isSelected));
+    });
 }
 
 function renderUpdatePanel() {
@@ -959,16 +995,15 @@ function bindUpdatePanelEvents() {
     mainFrame?.addEventListener("click", openUpdateModal);
     thumbStrip?.querySelectorAll("[data-update-thumb]").forEach((button) => {
         button.addEventListener("click", () => {
-            setSelectedUpdateImageIndex(currentUpdateId, Number(button.dataset.imageIndex));
-            renderUpdatePanel();
-            renderLucideIcons();
-            window.setTimeout(() => {
-                const strip = document.getElementById("updateThumbStrip");
-                const selected = strip?.querySelector(".is-selected");
-                if (strip && selected) {
-                    selected.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-                }
-            }, 50);
+            const index = Number(button.dataset.imageIndex);
+            setSelectedUpdateImageIndex(currentUpdateId, index);
+
+            updateMainPhoto(getUpdateImages(currentUpdateId), index);
+
+            const selected = thumbStrip?.querySelector(".is-selected");
+            if (thumbStrip && selected) {
+                selected.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+            }
         });
     });
 
