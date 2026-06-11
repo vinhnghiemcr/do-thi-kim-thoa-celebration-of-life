@@ -1070,6 +1070,38 @@ button {
     color: #f8efe6;
 }
 
+.lightbox-controls {
+    position: absolute;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%);
+    z-index: 61;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+}
+
+.lightbox-controls .gallery-control,
+.lightbox-controls .gallery-control-icon,
+.lightbox-controls .lightbox-counter {
+    color: #ffffff;
+}
+
+.lightbox-controls .gallery-control {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: none;
+}
+
+.lightbox-controls .gallery-control svg,
+.lightbox-controls .gallery-control-icon svg {
+    stroke: #ffffff;
+}
+
 .lightbox-meta {
     margin: 0;
     font-size: 0.86rem;

@@ -56,6 +56,11 @@ const lightboxCaption = document.getElementById("lightboxCaption");
 const lightboxClose = document.getElementById("lightboxClose");
 const lightboxPrev = document.getElementById("lightboxPrev");
 const lightboxNext = document.getElementById("lightboxNext");
+const lightboxControls = document.getElementById("lightboxControls");
+const lightboxPrevControl = document.getElementById("lightboxPrevControl");
+const lightboxToggle = document.getElementById("lightboxToggle");
+const lightboxNextControl = document.getElementById("lightboxNextControl");
+const lightboxCounter = document.getElementById("lightboxCounter");
 
 let currentLanguage = getInitialLanguage();
 let currentUpdateId = siteData.dailyUpdates[0].id;
@@ -67,6 +72,7 @@ let galleryAutoplayTimer = null;
 let galleryAutoplayEnabled = true;
 let lightboxItems = [];
 let lightboxIndex = 0;
+let lightboxMode = "default";
 let galleryStageLoadToken = 0;
 const brokenGallerySources = new Set();
 
@@ -586,9 +592,8 @@ function bindGalleryControlEvents() {
             }
 
             if (source === "slideshow") {
-                toggleGalleryFullscreen().catch((error) => {
-                    console.error("Unable to toggle fullscreen gallery view.", error);
-                });
+                const items = getFinalGalleryItems();
+                openLightbox(items, currentGalleryIndex, { mode: "slideshow" });
             }
         });
     });
@@ -617,6 +622,12 @@ function updateGalleryToggleLabel() {
     galleryToggle.setAttribute("aria-label", label);
     galleryToggle.setAttribute("title", label);
     galleryToggle.setAttribute("aria-pressed", String(!galleryAutoplayEnabled));
+    if (lightboxToggle) {
+        lightboxToggle.innerHTML = `<i data-lucide="${galleryAutoplayEnabled ? "pause" : "play"}" aria-hidden="true"></i>`;
+        lightboxToggle.setAttribute("aria-label", label);
+        lightboxToggle.setAttribute("title", label);
+        lightboxToggle.setAttribute("aria-pressed", String(!galleryAutoplayEnabled));
+    }
     renderLucideIcons();
 }
 
@@ -659,7 +670,11 @@ function startGalleryAutoplay() {
 
     resetGalleryProgress();
     galleryAutoplayTimer = window.setInterval(() => {
-        setGalleryIndex(currentGalleryIndex + 1);
+        if (lightbox.classList.contains("is-open") && lightboxMode === "slideshow") {
+            moveLightbox(1);
+        } else {
+            setGalleryIndex(currentGalleryIndex + 1);
+        }
         resetGalleryProgress();
     }, siteData.gallerySlideshow.intervalMs);
 }
@@ -726,13 +741,15 @@ function bindTimelineEvents() {
     });
 }
 
-function openLightbox(items, index) {
+function openLightbox(items, index, { mode = "default" } = {}) {
     lightboxItems = items;
     lightboxIndex = index;
+    lightboxMode = mode;
     updateLightbox();
     lightbox.classList.add("is-open");
     lightbox.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
+    lightboxControls.hidden = lightboxMode !== "slideshow";
 }
 
 function updateLightbox() {
@@ -749,12 +766,19 @@ function updateLightbox() {
         meta: item.meta
     });
     lightboxCaption.textContent = item.caption;
+    if (lightboxMode === "slideshow") {
+        currentGalleryIndex = lightboxIndex;
+        lightboxCounter.textContent = `${lightboxIndex + 1} / ${lightboxItems.length}`;
+        renderGallery();
+    }
 }
 
 function closeLightbox() {
     lightbox.classList.remove("is-open");
     lightbox.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
+    lightboxMode = "default";
+    lightboxControls.hidden = true;
 }
 
 function moveLightbox(direction) {
@@ -847,6 +871,19 @@ function bindEvents() {
     lightboxClose.addEventListener("click", closeLightbox);
     lightboxPrev.addEventListener("click", () => moveLightbox(-1));
     lightboxNext.addEventListener("click", () => moveLightbox(1));
+    lightboxPrevControl.addEventListener("click", () => moveLightbox(-1));
+    lightboxNextControl.addEventListener("click", () => moveLightbox(1));
+    lightboxToggle.addEventListener("click", () => {
+        galleryAutoplayEnabled = !galleryAutoplayEnabled;
+
+        if (galleryAutoplayEnabled) {
+            startGalleryAutoplay();
+        } else {
+            stopGalleryAutoplay();
+        }
+
+        updateGalleryToggleLabel();
+    });
 
     lightbox.addEventListener("click", (event) => {
         if (event.target === lightbox) {
