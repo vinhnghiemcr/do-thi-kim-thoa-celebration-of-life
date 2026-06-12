@@ -148,27 +148,50 @@ button {
 .language-toggle {
     display: inline-flex;
     align-items: center;
-    padding: 0.25rem;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
+    align-self: flex-end;
 }
 
 .language-button {
-    border: 0;
-    background: transparent;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.8);
     color: var(--muted);
-    padding: 0.55rem 0.85rem;
+    padding: 0.58rem 0.7rem;
     border-radius: 999px;
     cursor: pointer;
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.2rem;
+    white-space: nowrap;
+    transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
-.language-button.is-active {
+.language-toggle[data-current-language="en"] {
+    color: #fff9f3;
+}
+
+.language-toggle[data-current-language="vi"] {
+    color: #fff9f3;
+}
+
+.language-toggle[data-current-language="en"] .language-button,
+.language-toggle[data-current-language="vi"] .language-button {
     background: var(--ink);
-    color: #fff8f0;
+    color: #fff9f3;
+    border-color: var(--ink);
+}
+
+.language-button:hover,
+.language-button:focus-visible {
+    color: #fff9f3;
+}
+
+.language-button:focus-visible {
+    outline: 2px solid rgba(35, 29, 25, 0.18);
+    outline-offset: 2px;
 }
 
 .menu-toggle {
@@ -873,6 +896,21 @@ button {
     box-shadow: 0 18px 36px rgba(35, 29, 25, 0.16);
 }
 
+.update-modal-thumb-strip .update-thumb-item {
+    border-color: transparent;
+    opacity: 0.55;
+}
+
+.update-modal-thumb-strip .update-thumb-item:hover {
+    opacity: 0.85;
+}
+
+.update-modal-thumb-strip .update-thumb-item.is-selected {
+    border-color: #ffffff !important;
+    opacity: 1;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
 .gallery-slideshow {
     padding: 1rem;
 }
@@ -1446,13 +1484,14 @@ button {
     }
 
     .language-toggle {
-        padding: 0.08rem;
+        align-self: flex-end;
     }
 
     .language-button {
-        padding: 0.18rem 0.34rem;
-        font-size: 0.58rem;
-        letter-spacing: 0.05em;
+        padding: 0.58rem 0.7rem;
+        font-size: 0.68rem;
+        letter-spacing: 0.04em;
+        min-width: 5.2rem;
     }
 
     .hero-copy,

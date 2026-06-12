@@ -1,6 +1,107 @@
 const importedGallery = window.memorialGooglePhotosGallery || null;
 
-window.memorialSiteData = {
+const nameMap = {
+    en: {
+        "Maria Đỗ Thị Kim Thoa": "Maria Thoa Kim Thi Do",
+        "Hoàng Dương Kiểm": "Kiem Duong Hoang",
+        "Hoàng Thanh Hằng": "Ann Hoang",
+        "Hoàng Quỳnh Trâm": "Trammy Hoang",
+        "Hoàng Mai Anh": "Mai Hoang",
+        "Hoàng Mộng Thúy": "Thuy Hoang",
+        "Hoàng Dương Thiện": "Thien Hoang",
+        "Trần Văn Khôi": "Khoi Tran",
+        "Vũ Trần Thế Uyên": "Uyen Vu",
+        "Nguyễn Thị Nganh": "Nganh Thi Nguyen",
+        "Đỗ Văn Phi": "Phi Van Do",
+        "Đỗ Đình Chương": "Chuong Dinh Do",
+        "Trương Nguyễn Thoại Châu": "Tina Truong",
+        "Yến": "Kayla",
+        "Trân": "Evelyn",
+        "Khoa": "Paul",
+        "Khiêm": "Joseph",
+        "Thành": "John",
+        "Thịnh": "James"
+    },
+    vi: {
+        "Maria Thoa Kim Thi Do": "Maria Đỗ Thị Kim Thoa",
+        "Kiem Duong Hoang": "Hoàng Dương Kiểm",
+        "Ann Hoang": "Hoàng Thanh Hằng",
+        "Trammy Hoang": "Hoàng Quỳnh Trâm",
+        "Mai Hoang": "Hoàng Mai Anh",
+        "Thuy Hoang": "Hoàng Mộng Thúy",
+        "Thien Hoang": "Hoàng Dương Thiện",
+        "Khoi Tran": "Trần Văn Khôi",
+        "Uyen Vu": "Vũ Trần Thế Uyên",
+        "Nganh Thi Nguyen": "Nguyễn Thị Nganh",
+        "Phi Van Do": "Đỗ Văn Phi",
+        "Chuong Dinh Do": "Đỗ Đình Chương",
+        "Tina Truong": "Trương Nguyễn Thoại Châu",
+        "Kayla": "Yến",
+        "Evelyn": "Trân",
+        "Paul": "Khoa",
+        "Joseph": "Khiêm",
+        "John": "Thành",
+        "James": "Thịnh"
+    }
+};
+
+const placeMap = {
+    en: {
+        "Nhà Thờ Các Thánh Tử Đạo VN": "Vietnamese Martyrs Catholic Church",
+        "Phủ Đà": "Phu Da",
+        "Phú Đa": "Phu Da",
+        "Lý Nhân": "Ly Nhan",
+        "Hà Nam": "Ha Nam",
+        "Việt Nam": "Vietnam",
+        "Rạch Giá": "Rach Gia",
+        "Vạn Kiếp": "Van Kiep",
+        "Sài Gòn": "Saigon"
+    },
+    vi: {
+        "Vietnamese Martyrs Catholic Church": "Nhà Thờ Các Thánh Tử Đạo VN",
+        "Phu Da": "Phú Đa",
+        "Ly Nhan": "Lý Nhân",
+        "Ha Nam": "Hà Nam",
+        "Ha Nam Province": "tỉnh Hà Nam",
+        "Vietnam": "Việt Nam",
+        "Rach Gia": "Rạch Giá",
+        "Van Kiep": "Vạn Kiếp",
+        "Saigon": "Sài Gòn"
+    }
+};
+
+function replaceMappedText(value, language) {
+    if (typeof value !== "string") {
+        return value;
+    }
+
+    return [placeMap[language], nameMap[language]].reduce((text, replacements) => Object.entries(replacements).reduce(
+        (nextText, [from, to]) => nextText.replaceAll(from, to),
+        text
+    ), value);
+}
+
+function applyLocalizedMappings(value) {
+    if (Array.isArray(value)) {
+        return value.map(applyLocalizedMappings);
+    }
+
+    if (!value || typeof value !== "object") {
+        return value;
+    }
+
+    if (Object.hasOwn(value, "en") || Object.hasOwn(value, "vi")) {
+        return {
+            ...value,
+            en: replaceMappedText(value.en, "en"),
+            vi: replaceMappedText(value.vi, "vi")
+        };
+    }
+
+    return Object.fromEntries(Object.entries(value).map(([key, entryValue]) => [key, applyLocalizedMappings(entryValue)]));
+}
+
+const memorialSiteData = {
     defaultLanguage: "en",
     page: {
         title: {
@@ -217,8 +318,14 @@ window.memorialSiteData = {
         }
     },
     hero: {
-        name: "Maria Đỗ Thị Kim Thoa",
-        dates: "November 12, 1947 - June 8, 2026",
+        name: {
+            en: "Maria Đỗ Thị Kim Thoa",
+            vi: "Maria Đỗ Thị Kim Thoa"
+        },
+        dates: {
+            en: "November 12, 1947 - June 8, 2026",
+            vi: "12 tháng 11, 1947 - 8 tháng 6, 2026"
+        },
         intro: {
             en: "In faith in the Risen Christ, our family respectfully announces: <strong>Mrs. Maria Đỗ Thị Kim Thoa</strong>, born on November 12, 1947 in Phú Đa, Lý Nhân, Hà Nam, Vietnam was called home to the Lord at 12:30 PM on June 8, 2026, in Arlington, Texas, USA, at the age of 78.",
             vi: "Trong niềm tin vào Chúa Kitô Phục Sinh, gia đình chúng tôi kính báo: <strong>Bà Maria Đỗ Thị Kim Thoa</strong>, sinh ngày 12 tháng 11 năm 1947 tại Phú Đa, Lý Nhân, Hà Nam, Việt Nam, đã được Chúa gọi về lúc 12:30 PM ngày 8 tháng 6 năm 2026 tại Arlington, Texas, Hoa Kỳ, hưởng thọ 78 tuổi."
@@ -249,7 +356,10 @@ window.memorialSiteData = {
                         en: "Blessing of the Mourning Bands",
                         vi: "Làm Phép Khăn Tang"
                     },
-                    venue: "Nhà Thờ Các Thánh Tử Đạo VN",
+                    venue: {
+                        en: "Vietnamese Martyrs Catholic Church",
+                        vi: "Nhà Thờ Các Thánh Tử Đạo VN"
+                    },
                     address: "801 E. Mayfield Rd., Arlington, TX 76014",
                     mapsUrl: "https://www.google.com/maps/search/?api=1&query=801+E+Mayfield+Rd,+Arlington,+TX+76014",
                     note: {
@@ -323,7 +433,10 @@ window.memorialSiteData = {
                         en: "Funeral Mass",
                         vi: "Thánh Lễ An Táng"
                     },
-                    venue: "Nhà Thờ Các Thánh Tử Đạo VN",
+                    venue: {
+                        en: "Vietnamese Martyrs Catholic Church",
+                        vi: "Nhà Thờ Các Thánh Tử Đạo VN"
+                    },
                     address: "801 E. Mayfield Rd., Arlington, TX 76014",
                     mapsUrl: "https://www.google.com/maps/search/?api=1&query=801+E+Mayfield+Rd,+Arlington,+TX+76014",
                     note: {
@@ -377,16 +490,16 @@ window.memorialSiteData = {
                 vi: "1947"
             },
             title: {
-                en: "Roots in Phủ Đà, Hà Nam",
-                vi: "Cội nguồn tại Phủ Đà, Hà Nam"
+                en: "Roots in Phú Đa, Hà Nam",
+                vi: "Cội nguồn tại Phú Đa, Hà Nam"
             },
             captionTitle: {
                 en: "Birthplace",
                 vi: "Quê quán"
             },
             caption: {
-                en: "Maria Đỗ Thị Kim Thoa was born on November 12, 1947 in Phủ Đà, Lý Nhân, Hà Nam, Việt Nam. This early portrait remembers her younger years and the beginnings of her life in Hà Nam.",
-                vi: "Bà Maria Đỗ Thị Kim Thoa sinh ngày 12 tháng 11 năm 1947 tại Phủ Đà, Lý Nhân, Hà Nam, Việt Nam. Bức ảnh này gợi nhớ những năm tháng tuổi trẻ và khởi đầu cuộc đời của bà tại Hà Nam."
+                en: "Maria Đỗ Thị Kim Thoa was born on November 12, 1947 in Phú Đa, Lý Nhân, Hà Nam, Việt Nam. This early portrait remembers her younger years and the beginnings of her life in Hà Nam.",
+                vi: "Bà Maria Đỗ Thị Kim Thoa sinh ngày 12 tháng 11 năm 1947 tại Phú Đa, Lý Nhân, Hà Nam, Việt Nam. Bức ảnh này gợi nhớ những năm tháng tuổi trẻ và khởi đầu cuộc đời của bà tại Hà Nam."
             },
             image: {
                 src: "images/life/maria-do-thi-kim-thoa-early-years.jpg",
@@ -435,8 +548,8 @@ window.memorialSiteData = {
                 vi: "Người thân yêu"
             },
             caption: {
-                en: "She is lovingly remembered by her husband Alphonse Hoàng Dương Kiêm; her children Hoàng Thanh Hằng, Hoàng Quỳnh Trâm, Hoàng Mai Anh, Hoàng Mộng Thúy, and Hoàng Dương Thiện; and by her grandchildren and extended family. This portrait honors the family she helped shape across generations.",
-                vi: "Bà được thương nhớ bởi chồng là ông Alphonse Hoàng Dương Kiêm; các con Hoàng Thanh Hằng, Hoàng Quỳnh Trâm, Hoàng Mai Anh, Hoàng Mộng Thúy, và Hoàng Dương Thiện; cùng các cháu và đại gia đình. Bức ảnh này tôn vinh gia đình mà bà đã góp phần vun đắp qua nhiều thế hệ."
+                en: "She is lovingly remembered by her husband Alphonse Hoàng Dương Kiểm; her children Hoàng Thanh Hằng, Hoàng Quỳnh Trâm, Hoàng Mai Anh, Hoàng Mộng Thúy, and Hoàng Dương Thiện; and by her grandchildren and extended family. This portrait honors the family she helped shape across generations.",
+                vi: "Bà được thương nhớ bởi chồng là ông Alphonse Hoàng Dương Kiểm; các con Hoàng Thanh Hằng, Hoàng Quỳnh Trâm, Hoàng Mai Anh, Hoàng Mộng Thúy, và Hoàng Dương Thiện; cùng các cháu và đại gia đình. Bức ảnh này tôn vinh gia đình mà bà đã góp phần vun đắp qua nhiều thế hệ."
             },
             image: {
                 src: "images/life/maria-do-thi-kim-thoa-legacy-years.jpg",
@@ -451,14 +564,14 @@ window.memorialSiteData = {
         previewCount: 2,
         paragraphs: {
             en: [
-                "Thoa Kim Thi Do passed away peacefully on June 8, 2026, surrounded by the love of her family. She was born on November 12, 1947, in the village of Phú Đa, Ha Nam Province, Vietnam, to Nguyen Thi Nganh and Do Van Phi. She was the sixth of seven children, with one older sister, four older brothers, and one younger brother.",
+                "Maria Thoa Kim Thi Do passed away peacefully on June 8, 2026, surrounded by the love of her family. She was born on November 12, 1947, in the village of Phú Đa, Ha Nam Province, Vietnam, to Nguyen Thi Nganh and Do Van Phi. She was the sixth of seven children, with one older sister, four older brothers, and one younger brother.",
                 "In 1954, Thoa relocated with her mother and siblings to southern Vietnam, living first in Rach Gia and Van Kiep before eventually settling in Saigon. Growing up during a time of hardship and uncertainty, she learned resilience and independence at an early age. At just 16 years old, she began working for the French pharmaceutical company Roussel. Through determination, intelligence, and an unwavering work ethic, she advanced to the position of Manufacturing Supervisor, dedicating 23 years of service to the company.",
                 "Strong-willed, fearless, and generous, Thoa became the de facto matriarch of her extended family. Her dedication and sacrifice helped provide stability for her loved ones, including funding the construction of the family's multigenerational home in southern Vietnam.",
-                "On October 8, 1972, she married Alphonse Kiem Hoang. Through joys and sorrows, blessings and trials, she remained steadfast in her love and devotion to her husband and family. Together, they built a family centered on faith, hard work, and sacrifice, and were blessed with five children: Ann, Trammy, Mai, Thuy, and Thien.",
+                "On October 8, 1972, she married Alphonse Kiem Duong Hoang. Through joys and sorrows, blessings and trials, she remained steadfast in her love and devotion to her husband and family. Together, they built a family centered on faith, hard work, and sacrifice, and were blessed with five children: Ann, Trammy, Mai, Thuy, and Thien.",
                 "In November 1990, Thoa and her family immigrated to the United States, initially settling in Harvey, Louisiana, before making their home in Arlington, Texas, where she lived for the next 35 years. After arriving in America, she worked as a seamstress and later operated a home daycare business, caring for countless children before retiring.",
                 "A devout Catholic, Thoa was deeply involved in her parish community and numerous church organizations, often serving in leadership roles. Her faith was reflected in her actions and generosity. She dedicated herself to charitable causes close to her heart, including supporting the poor and sick, funding vocational education, sponsoring priests and religious sisters, and contributing to missionary work both in the United States and abroad.",
                 "Above all else, Thoa was a devoted wife, mother, grandmother, sister, and friend. She found her greatest joy in caring for her family and celebrating their accomplishments. Her strength, kindness, wisdom, and steadfast faith touched all who knew her and will remain a lasting legacy for generations to come.",
-                "She is survived by her beloved husband of more than 53 years, Alphonse Kiem Hoang; her daughter Ann Hoang and husband Khoi Tran, and their four sons, Paul, Joseph, John, and James; her daughter Trammy Hoang and husband Uyen Vu, and their daughters, Kayla and Evelyn; her daughters Mai Hoang and Thuy Hoang; her son Thien Hoang and wife Tina Truong, and their children, Evan and Emery; her older brother Do Dinh Chuong; and many cherished nieces, nephews, relatives, and friends throughout the United States and Vietnam.",
+                "She is survived by her beloved husband of more than 53 years, Alphonse Kiem Duong Hoang; her daughter Ann Hoang and husband Khoi Tran, and their four sons, Paul, Joseph, John, and James; her daughter Trammy Hoang and husband Uyen Vu, and their daughters, Kayla and Evelyn; her daughters Mai Hoang and Thuy Hoang; her son Thien Hoang and wife Tina Truong, and their children, Evan and Emery; her older brother Do Dinh Chuong; and many cherished nieces, nephews, relatives, and friends throughout the United States and Vietnam.",
                 "Thoa was preceded in death by her parents, Nguyen Thi Nganh and Do Van Phi, her sister, and four brothers.",
                 "Though she will be deeply missed, her family finds comfort in knowing that she lived a life of faith, service, sacrifice, and love. Her memory will forever remain in the hearts of those who were blessed to know her."
             ],
@@ -470,7 +583,7 @@ window.memorialSiteData = {
                 "Vào tháng 11 năm 1990, bà Thoa cùng gia đình định cư tại Hoa Kỳ, trước tiên sống tại Harvey, Louisiana, rồi sau đó lập nghiệp ở Arlington, Texas, nơi bà gắn bó trong 35 năm tiếp theo. Sau khi đến Mỹ, bà làm nghề may và về sau mở dịch vụ giữ trẻ tại nhà, chăm sóc biết bao trẻ nhỏ trước khi nghỉ hưu.",
                 "Là một người Công giáo hết lòng sốt mến, bà Thoa gắn bó sâu đậm với cộng đoàn giáo xứ và nhiều đoàn thể trong Giáo hội, thường đảm nhận những vai trò lãnh đạo. Đức tin của bà được thể hiện qua việc làm và lòng quảng đại. Bà tận hiến cho những công việc bác ái gần gũi với trái tim mình, như giúp đỡ người nghèo và người đau yếu, hỗ trợ việc học nghề, bảo trợ các linh mục và nữ tu, cũng như đóng góp cho công cuộc truyền giáo tại Hoa Kỳ, Việt Nam và nhiều nơi khác.",
                 "Trên hết, bà Thoa là người vợ, người mẹ, người bà, người chị em, và người bạn đầy yêu thương. Niềm vui lớn nhất của bà là chăm lo cho gia đình và vui mừng trước những thành quả của người thân. Sức mạnh, lòng nhân hậu, sự khôn ngoan, và đức tin bền vững của bà đã chạm đến tất cả những ai quen biết bà, và sẽ còn là một di sản lâu bền cho nhiều thế hệ mai sau.",
-                "Bà để lại người chồng yêu quý đã gắn bó hơn 53 năm là ông Alphonse Hoàng Dương Kiểm; người con gái Hoàng Thanh Hằng và chồng là Trần Văn Khôi cùng bốn người con trai là Khoa, Khiêm, Thành, và Thịnh; người con gái Hoàng Quỳnh Trâm và chồng là Vũ Trần Thế Uyên cùng hai con gái là Yến và Linh Trân; hai người con gái Hoàng Mai Anh và Hoàng Mộng Thúy; người con trai Hoàng Dương Thiện và vợ là Trương Nguyễn Thoại Châu cùng hai người con là Evan và Emery; người anh ruột là Đỗ Đình Chương; cùng nhiều cháu, họ hàng, thân quyến, và bạn hữu thương mến tại Hoa Kỳ và Việt Nam.",
+                "Bà để lại người chồng yêu quý đã gắn bó hơn 53 năm là ông Alphonse Hoàng Dương Kiểm; người con gái Hoàng Thanh Hằng và chồng là Trần Văn Khôi cùng bốn người con trai là Khoa, Khiêm, Thành, và Thịnh; người con gái Hoàng Quỳnh Trâm và chồng là Vũ Trần Thế Uyên cùng hai con gái là Yến và Trân; hai người con gái Hoàng Mai Anh và Hoàng Mộng Thúy; người con trai Hoàng Dương Thiện và vợ là Trương Nguyễn Thoại Châu cùng hai người con là Evan và Emery; người anh ruột là Đỗ Đình Chương; cùng nhiều cháu, họ hàng, thân quyến, và bạn hữu thương mến tại Hoa Kỳ và Việt Nam.",
                 "Bà Thoa đã được đoàn tụ với cha mẹ là ông Đỗ Văn Phi và bà Nguyễn Thị Nganh, cùng người chị gái và bốn người anh trai đã qua đời trước bà.",
                 "Dù bà sẽ được nhớ thương sâu sắc, gia đình tìm thấy niềm an ủi khi biết rằng bà đã sống một cuộc đời của đức tin, phục vụ, hy sinh, và yêu thương. Ký ức về bà sẽ mãi còn trong trái tim của tất cả những ai từng được diễm phúc biết đến bà."
             ]
@@ -486,7 +599,7 @@ window.memorialSiteData = {
         }
     },
     galleryContribution: {
-        url: "https://photos.google.com/u/1/share/AF1QipNY41unK8UGTl883_zAZqInVm7eiNP3sA7Ja1udirWi4zb8cmrpccsLStx5n8Qp7Q?pli=1&key=T0FQYWFoVGpFUXJsRk5YZ1d2VmUxdEtzQUF5VjNn",
+        url: "https://photos.app.goo.gl/ZmmADbb335Z9gSjr5",
         copy: {
             en: "Have memorial photos to share? Add them to the family gallery here.",
             vi: "Nếu quý vị có ảnh tưởng niệm muốn chia sẻ, xin thêm vào thư viện gia đình tại đây."
@@ -797,3 +910,5 @@ window.memorialSiteData = {
         }
     ]
 };
+
+window.memorialSiteData = applyLocalizedMappings(memorialSiteData);

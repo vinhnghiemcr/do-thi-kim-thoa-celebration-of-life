@@ -1,8 +1,13 @@
 const siteData = window.memorialSiteData;
 const LANGUAGE_STORAGE_KEY = "memorial-language";
 const SUPPORTED_LANGUAGES = ["en", "vi"];
+const LANGUAGE_LABELS = {
+    en: "English",
+    vi: "Tiếng Việt"
+};
 
 const heroName = document.getElementById("heroName");
+const brandName = document.getElementById("brandName");
 const heroDates = document.getElementById("heroDates");
 const heroIntro = document.getElementById("heroIntro");
 const heroNote = document.getElementById("heroNote");
@@ -52,6 +57,7 @@ const galleryProgressBar = document.getElementById("galleryProgressBar");
 const galleryStagePanel = galleryStage?.closest(".gallery-stage-panel");
 
 const languageToggle = document.getElementById("languageToggle");
+const languageToggleButton = document.getElementById("languageToggleButton");
 
 const updateModal = document.getElementById("updateModal");
 const updateModalStage = document.getElementById("updateModalStage");
@@ -83,8 +89,15 @@ let lightboxItems = [];
 let lightboxIndex = 0;
 let lightboxMode = "default";
 let updateModalOpen = false;
+let tabSwitchTimer = null;
+let updateImagesPrimeObserver = null;
 let galleryStageLoadToken = 0;
 const brokenGallerySources = new Set();
+const imageCache = new Map();
+const preloadQueue = [];
+let preloadRunning = false;
+const PRELOAD_CONCURRENCY = 3;
+let activePreloads = 0;
 
 const randomizedFinalGallery = shuffleArray(siteData.finalGallery);
 const updateGalleryState = Object.fromEntries(siteData.dailyUpdates.map((day) => [
@@ -96,8 +109,220 @@ const updateGalleryState = Object.fromEntries(siteData.dailyUpdates.map((day) =>
     }
 ]));
 const updateSelectedImageIndex = Object.fromEntries(siteData.dailyUpdates.map((day) => [day.id, 0]));
+const updateThumbStripScroll = Object.fromEntries(siteData.dailyUpdates.map((day) => [day.id, 0]));
+const updateModalThumbStripScroll = Object.fromEntries(siteData.dailyUpdates.map((day) => [day.id, 0]));
 
 const UPDATE_REFRESH_MS = 60 * 1000;
+const UPDATE_VIEWER_SIZES = "(max-width: 768px) 92vw, (max-width: 1200px) 86vw, 1200px";
+const UPDATE_THUMB_SIZES = "(max-width: 768px) 96px, 112px";
+const UPDATE_SESSION_CACHE_PREFIX = "memorial-update-gallery";
+
+async function getCachedImageUrl(src) {
+    if (!src) {
+        return src;
+    }
+
+    if (imageCache.has(src)) {
+        return imageCache.get(src);
+    }
+
+    const promise = fetch(src)
+        .then((response) => response.blob())
+        .then((blob) => {
+            const objectUrl = URL.createObjectURL(blob);
+            imageCache.set(src, objectUrl);
+            return objectUrl;
+        })
+        .catch(() => {
+            imageCache.delete(src);
+            return src;
+        });
+
+    imageCache.set(src, promise);
+    return promise;
+}
+
+function enqueuePreload(url, priority = 5) {
+    if (!url || imageCache.has(url)) {
+        return;
+    }
+
+    const existing = preloadQueue.findIndex((item) => item.url === url);
+    if (existing !== -1) {
+        if (priority < preloadQueue[existing].priority) {
+            preloadQueue[existing].priority = priority;
+            preloadQueue.sort((a, b) => a.priority - b.priority);
+        }
+        return;
+    }
+
+    preloadQueue.push({ url, priority });
+    preloadQueue.sort((a, b) => a.priority - b.priority);
+    drainPreloadQueue();
+}
+
+function drainPreloadQueue() {
+    if (preloadRunning && activePreloads >= PRELOAD_CONCURRENCY) {
+        return;
+    }
+
+    preloadRunning = true;
+
+    while (activePreloads < PRELOAD_CONCURRENCY && preloadQueue.length > 0) {
+        const { url } = preloadQueue.shift();
+        if (imageCache.has(url)) {
+            continue;
+        }
+
+        activePreloads += 1;
+        getCachedImageUrl(url).finally(() => {
+            activePreloads -= 1;
+            drainPreloadQueue();
+        });
+    }
+
+    if (preloadQueue.length === 0 && activePreloads === 0) {
+        preloadRunning = false;
+    }
+}
+
+function scheduleSmartPreload(images, selectedIndex) {
+    if (!images.length) {
+        return;
+    }
+
+    preloadQueue.length = 0;
+
+    const selected = images[selectedIndex];
+    if (selected?.src) {
+        enqueuePreload(selected.src, 0);
+    }
+
+    const selectedDisplay = selected?.displaySrc || selected?.thumbSrc;
+    if (selectedDisplay && selectedDisplay !== selected?.src) {
+        enqueuePreload(selectedDisplay, 0);
+    }
+
+    for (let offset = 1; offset <= 3; offset += 1) {
+        const prev = images[selectedIndex - offset];
+        const next = images[selectedIndex + offset];
+
+        if (prev?.thumbSrc) {
+            enqueuePreload(prev.thumbSrc, 1);
+        }
+        if (next?.thumbSrc) {
+            enqueuePreload(next.thumbSrc, 1);
+        }
+    }
+
+    for (let offset = 1; offset <= 1; offset += 1) {
+        const prev = images[selectedIndex - offset];
+        const next = images[selectedIndex + offset];
+
+        if (prev?.src) {
+            enqueuePreload(prev.src, 2);
+        }
+        if (next?.src) {
+            enqueuePreload(next.src, 2);
+        }
+    }
+}
+
+function escapeHtmlAttribute(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+function getUpdateImageDisplaySrc(image) {
+    return image?.displaySrc || image?.thumbSrc || image?.src || "";
+}
+
+function getUpdateResponsiveAttributes(image, kind = "viewer") {
+    const srcSet = kind === "thumb" ? image?.thumbSrcSet : image?.viewerSrcSet;
+    const sizes = kind === "thumb"
+        ? (image?.thumbSizes || UPDATE_THUMB_SIZES)
+        : (image?.viewerSizes || UPDATE_VIEWER_SIZES);
+
+    return `${srcSet ? ` srcset="${escapeHtmlAttribute(srcSet)}"` : ""}${sizes ? ` sizes="${escapeHtmlAttribute(sizes)}"` : ""}`;
+}
+
+function getUpdateTimeBucket() {
+    return Math.floor(Date.now() / (60 * 1000));
+}
+
+function getUpdateSessionCacheKey(updateId, query, timeBucket) {
+    return `${UPDATE_SESSION_CACHE_PREFIX}:${updateId}:${timeBucket}:${query}`;
+}
+
+function readUpdateSessionCache(updateId, query, timeBucket) {
+    try {
+        const raw = window.sessionStorage.getItem(getUpdateSessionCacheKey(updateId, query, timeBucket));
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed?.images) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeUpdateSessionCache(updateId, query, timeBucket, images) {
+    try {
+        window.sessionStorage.setItem(
+            getUpdateSessionCacheKey(updateId, query, timeBucket),
+            JSON.stringify({
+                images: images.map((image) => ({
+                    src: image.src,
+                    displaySrc: image.displaySrc,
+                    thumbSrc: image.thumbSrc,
+                    viewerSrcSet: image.viewerSrcSet,
+                    viewerSizes: image.viewerSizes,
+                    thumbSrcSet: image.thumbSrcSet,
+                    thumbSizes: image.thumbSizes,
+                    name: image.name,
+                    filename: image.filename,
+                    createdTime: image.createdTime,
+                    alt: image.alt,
+                    caption: image.caption
+                })),
+                cachedAt: Date.now()
+            })
+        );
+    } catch {
+        return;
+    }
+}
+
+function scheduleIdleUpdatePrime(dayId, delayMs = 0) {
+    const runPrime = () => {
+        fetchUpdateImages(dayId).catch((error) => {
+            console.error("Unable to prime daily photo folder", dayId, error);
+        });
+    };
+
+    const queueIdle = () => {
+        if (typeof window.requestIdleCallback === "function") {
+            window.requestIdleCallback(() => {
+                runPrime();
+            }, { timeout: 2500 });
+            return;
+        }
+
+        window.setTimeout(runPrime, 0);
+    };
+
+    if (delayMs > 0) {
+        window.setTimeout(queueIdle, delayMs);
+        return;
+    }
+
+    queueIdle();
+}
 
 function getInitialLanguage() {
     try {
@@ -186,11 +411,15 @@ function renderChrome() {
 }
 
 function renderLanguageToggle() {
-    languageToggle.querySelectorAll("[data-language]").forEach((button) => {
-        const isActive = button.dataset.language === currentLanguage;
-        button.classList.toggle("is-active", isActive);
-        button.setAttribute("aria-pressed", String(isActive));
-    });
+    const nextLanguage = currentLanguage === "en" ? "vi" : "en";
+    const nextLabel = LANGUAGE_LABELS[nextLanguage] || nextLanguage;
+
+    languageToggle.dataset.currentLanguage = currentLanguage;
+    languageToggle.setAttribute("aria-label", `Current language ${LANGUAGE_LABELS[currentLanguage]}. Switch to ${nextLabel}.`);
+    languageToggleButton.textContent = nextLabel;
+    languageToggleButton.dataset.language = nextLanguage;
+    languageToggleButton.setAttribute("aria-label", `Switch language to ${nextLabel}`);
+    languageToggleButton.setAttribute("title", nextLabel);
 }
 
 function renderGalleryContribution() {
@@ -212,8 +441,9 @@ function renderGalleryContribution() {
 }
 
 function setHero() {
-    heroName.textContent = siteData.hero.name;
-    heroDates.textContent = siteData.hero.dates;
+    brandName.textContent = getText(siteData.hero.name);
+    heroName.textContent = getText(siteData.hero.name);
+    heroDates.textContent = getText(siteData.hero.dates);
     heroIntro.innerHTML = getText(siteData.hero.intro);
     heroNote.textContent = getText(siteData.hero.note);
     heroImage.src = siteData.hero.image.src;
@@ -229,7 +459,7 @@ function renderSchedule() {
                 ${day.items.map((item) => `
                     <div class="schedule-item">
                         <strong>${item.time} · ${getText(item.title)}</strong>
-                        <p class="schedule-location">${item.venue}</p>
+                        <p class="schedule-location">${getText(item.venue)}</p>
                         <p class="schedule-address">
                             <a href="${item.mapsUrl}" target="_blank" rel="noreferrer">${item.address}</a>
                         </p>
@@ -373,7 +603,27 @@ function setSelectedUpdateImageIndex(updateId, index) {
     updateSelectedImageIndex[updateId] = Math.min(Math.max(index, 0), images.length - 1);
 }
 
-function buildUpdateStageMarkup(image, index, total, title, className) {
+function rememberUpdateThumbStripScroll(updateId, scrollLeft) {
+    updateThumbStripScroll[updateId] = Math.max(0, Number(scrollLeft) || 0);
+}
+
+function rememberUpdateModalThumbStripScroll(updateId, scrollLeft) {
+    updateModalThumbStripScroll[updateId] = Math.max(0, Number(scrollLeft) || 0);
+}
+
+function restoreStripScroll(strip, scrollLeft) {
+    if (!strip) {
+        return;
+    }
+
+    window.requestAnimationFrame(() => {
+        strip.scrollLeft = Math.max(0, Number(scrollLeft) || 0);
+    });
+}
+
+function buildUpdateStageMarkup(image, index, total, title, className, { useCachedDisplay = false } = {}) {
+    const previewSrc = getUpdateImageDisplaySrc(image);
+    const displaySrc = useCachedDisplay ? (image._cachedUrl || image.src) : previewSrc;
     return `
         <button
             class="${className}"
@@ -381,10 +631,10 @@ function buildUpdateStageMarkup(image, index, total, title, className) {
             aria-label="${formatText(siteData.ui.updates.mainFrameAria, { title })}"
         >
             <div class="update-main-background" aria-hidden="true">
-                <img class="update-main-bg-image" src="${image.src}" alt="">
+                <img class="update-main-bg-image" src="${displaySrc}"${getUpdateResponsiveAttributes(image, "viewer")} data-full-src="${image.src}" alt="" decoding="async">
             </div>
             <div class="update-main-foreground">
-                <img class="update-main-img" src="${image.src}" alt="${image.alt}">
+                <img class="update-main-img" src="${displaySrc}"${getUpdateResponsiveAttributes(image, "viewer")} data-full-src="${image.src}" data-image-index="${index}" alt="${image.alt}" decoding="async">
             </div>
             <span class="update-main-counter">${index + 1} / ${total}</span>
         </button>
@@ -400,20 +650,30 @@ function updateMainPhoto(images, index) {
     const mainBg = updatePanel.querySelector(".update-main-bg-image");
     const mainImg = updatePanel.querySelector(".update-main-img");
     const counter = updatePanel.querySelector(".update-main-counter");
+    const previewSrc = getUpdateImageDisplaySrc(image);
+    const fullSrc = image.src;
 
     if (mainBg) {
-        mainBg.src = image.src;
+        mainBg.src = previewSrc;
+        if (image.viewerSrcSet) {
+            mainBg.srcset = image.viewerSrcSet;
+        }
+        mainBg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
+        mainBg.dataset.fullSrc = fullSrc;
     }
 
     if (mainImg) {
         mainImg.style.transition = "opacity 0.2s ease";
-        mainImg.style.opacity = "0";
-        mainImg.onload = () => {
-            mainImg.style.opacity = "1";
-            mainImg.onload = null;
-        };
-        mainImg.src = image.src;
+        mainImg.src = previewSrc;
+        if (image.viewerSrcSet) {
+            mainImg.srcset = image.viewerSrcSet;
+        }
+        mainImg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
+        mainImg.dataset.fullSrc = fullSrc;
+        mainImg.dataset.imageIndex = String(index);
         mainImg.alt = image.alt || "";
+        mainImg.style.opacity = "1";
+        mainImg.onload = null;
     }
 
     if (counter) {
@@ -424,6 +684,170 @@ function updateMainPhoto(images, index) {
         const isSelected = Number(button.dataset.imageIndex) === index;
         button.classList.toggle("is-selected", isSelected);
         button.setAttribute("aria-pressed", String(isSelected));
+    });
+
+    const upgradeCurrentImage = () => {
+        getCachedImageUrl(fullSrc).then((cachedUrl) => {
+            image._cachedUrl = cachedUrl;
+
+            if (!mainImg || mainImg.dataset.imageIndex !== String(index)) {
+                return;
+            }
+
+            if (mainBg) {
+                mainBg.src = cachedUrl;
+            }
+
+            mainImg.src = cachedUrl;
+        });
+    };
+
+    if (previewSrc !== fullSrc) {
+        upgradeCurrentImage();
+    } else {
+        getCachedImageUrl(fullSrc).then((cachedUrl) => {
+            image._cachedUrl = cachedUrl;
+        });
+    }
+
+    scheduleSmartPreload(images, index);
+}
+
+function renderUpdatePanelText() {
+    const hasViewer = updatePanel.querySelector(".update-grid, .update-main-frame, .update-empty-state");
+    if (!hasViewer) {
+        renderUpdatePanel();
+        return;
+    }
+
+    const day = getCurrentUpdate();
+    if (!day) {
+        return;
+    }
+
+    const images = getUpdateImages(day.id);
+    const dayTitle = getText(day.title);
+    const eyebrow = updatePanel.querySelector(".update-header .eyebrow");
+    const title = updatePanel.querySelector(".update-title");
+    const subtitle = updatePanel.querySelector(".update-day");
+    const summary = updatePanel.querySelector(".update-summary-copy p");
+    const kicker = updatePanel.querySelector(".update-photo-kicker");
+    const counter = updatePanel.querySelector(".update-photo-counter");
+    const contributeBtn = updatePanel.querySelector(".update-contribute-btn");
+    const contributeBtnLabel = contributeBtn?.querySelector("span");
+    const contributeCopy = updatePanel.querySelector(".update-contribute-copy");
+    const thumbStrip = document.getElementById("updateThumbStrip");
+    const mainFrame = updatePanel.querySelector(".update-main-frame");
+
+    if (eyebrow) eyebrow.textContent = getText(day.date);
+    if (title) title.textContent = dayTitle;
+    if (subtitle) subtitle.textContent = getText(day.subtitle);
+    if (summary) summary.textContent = getText(day.summary);
+    if (kicker) kicker.textContent = getText(siteData.ui.updates.photoKicker);
+    if (counter) counter.textContent = getPhotoCountLabel(images.length);
+    if (contributeBtnLabel) contributeBtnLabel.textContent = getText(siteData.ui.updates.contributeLabel);
+    if (contributeCopy) contributeCopy.textContent = getText(siteData.ui.updates.contributeCopy);
+    if (mainFrame) {
+        mainFrame.setAttribute("aria-label", formatText(siteData.ui.updates.mainFrameAria, { title: dayTitle }));
+    }
+    if (thumbStrip) {
+        thumbStrip.setAttribute("aria-label", formatText(siteData.ui.updates.thumbStripAria, { title: dayTitle }));
+        thumbStrip.querySelectorAll("[data-update-thumb]").forEach((button) => {
+            const index = Number(button.dataset.imageIndex);
+            button.setAttribute("aria-label", formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle }));
+        });
+    }
+}
+
+function appendNewUpdatePhotos(updateId, previousImages) {
+    const images = getUpdateImages(updateId);
+    const day = siteData.dailyUpdates.find((entry) => entry.id === updateId);
+    if (!day) {
+        return;
+    }
+
+    const previousCount = Array.isArray(previousImages) ? previousImages.length : 0;
+    const isAppendOnly = previousImages.every((image, index) => {
+        const nextImage = images[index];
+        return nextImage
+            && image.src === nextImage.src
+            && (image.thumbSrc || "") === (nextImage.thumbSrc || "")
+            && (image.name || "") === (nextImage.name || "")
+            && (image.filename || "") === (nextImage.filename || "")
+            && (image.alt || "") === (nextImage.alt || "")
+            && (image.createdTime || "") === (nextImage.createdTime || "");
+    });
+
+    if (!isAppendOnly) {
+        renderUpdatePanel();
+        bindGalleryControlEvents();
+        return;
+    }
+
+    const newPhotos = images.slice(previousCount);
+    if (newPhotos.length === 0) {
+        return;
+    }
+
+    const thumbStrip = document.getElementById("updateThumbStrip");
+    const counter = updatePanel.querySelector(".update-photo-counter");
+
+    if (!thumbStrip) {
+        renderUpdatePanel();
+        bindGalleryControlEvents();
+        return;
+    }
+
+    const dayTitle = getText(day.title);
+    const fragment = document.createDocumentFragment();
+
+    newPhotos.forEach((image, offset) => {
+        const index = previousCount + offset;
+        const button = document.createElement("button");
+        button.className = `update-thumb-item ${index === getSelectedUpdateImageIndex(updateId) ? "is-selected" : ""}`;
+        button.type = "button";
+        button.dataset.updateThumb = "true";
+        button.dataset.imageIndex = String(index);
+        button.setAttribute("aria-label", formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle }));
+        button.setAttribute("aria-pressed", String(index === getSelectedUpdateImageIndex(updateId)));
+
+        const img = document.createElement("img");
+        img.src = image.thumbSrc || image.src;
+        if (image.thumbSrcSet) {
+            img.srcset = image.thumbSrcSet;
+        }
+        img.sizes = image.thumbSizes || UPDATE_THUMB_SIZES;
+        img.alt = image.alt || "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        button.appendChild(img);
+        fragment.appendChild(button);
+    });
+
+    thumbStrip.appendChild(fragment);
+    syncUpdateSlideBackgrounds();
+
+    if (counter) {
+        counter.textContent = getPhotoCountLabel(images.length);
+    }
+
+    thumbStrip.querySelectorAll("[data-update-thumb]").forEach((button) => {
+        if (button.dataset.boundClick === "true") {
+            return;
+        }
+
+        button.dataset.boundClick = "true";
+        button.addEventListener("click", () => {
+            const index = Number(button.dataset.imageIndex);
+            setSelectedUpdateImageIndex(updateId, index);
+
+            updateMainPhoto(getUpdateImages(updateId), index);
+
+            const selected = thumbStrip.querySelector(".is-selected");
+            if (selected) {
+                selected.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+            }
+        });
     });
 }
 
@@ -477,7 +901,7 @@ function renderUpdatePanel() {
                             aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
                             aria-pressed="${index === selectedIndex ? "true" : "false"}"
                         >
-                            <img src="${image.src}" alt="${image.alt}">
+                            <img src="${image.thumbSrc || image.src}"${getUpdateResponsiveAttributes(image, "thumb")} alt="${image.alt}" loading="lazy" decoding="async">
                         </button>
                     `).join("")}
                 </div>
@@ -494,9 +918,15 @@ function renderUpdatePanel() {
         </div>
     `;
 
+    if (hasImages && selectedImage) {
+        updateMainPhoto(images, selectedIndex);
+    }
+
     syncUpdateSlideBackgrounds();
     renderUpdateModal();
     bindUpdatePanelEvents();
+    restoreStripScroll(document.getElementById("updateThumbStrip"), updateThumbStripScroll[day.id]);
+
 }
 
 function getCurrentUpdate() {
@@ -513,6 +943,38 @@ function getUpdateImages(updateId) {
 
 function getUpdateGalleryStatus(updateId) {
     return getUpdateGalleryState(updateId).status;
+}
+
+function applyModalStageImage(modalBg, modalImg, image, index, { preferCached = false } = {}) {
+    const previewSrc = getUpdateImageDisplaySrc(image);
+    const cachedSrc = image._cachedUrl || "";
+    const displaySrc = preferCached && cachedSrc ? cachedSrc : previewSrc;
+    const useResponsiveSources = !preferCached || !cachedSrc;
+
+    if (modalBg) {
+        modalBg.src = displaySrc;
+        if (useResponsiveSources && image.viewerSrcSet) {
+            modalBg.srcset = image.viewerSrcSet;
+            modalBg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
+        } else {
+            modalBg.removeAttribute("srcset");
+            modalBg.removeAttribute("sizes");
+        }
+    }
+
+    if (modalImg) {
+        modalImg.src = displaySrc;
+        if (useResponsiveSources && image.viewerSrcSet) {
+            modalImg.srcset = image.viewerSrcSet;
+            modalImg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
+        } else {
+            modalImg.removeAttribute("srcset");
+            modalImg.removeAttribute("sizes");
+        }
+        modalImg.dataset.imageIndex = String(index);
+        modalImg.style.transition = "opacity 0.2s ease";
+        modalImg.style.opacity = "1";
+    }
 }
 
 function renderUpdateModal() {
@@ -532,23 +994,101 @@ function renderUpdateModal() {
 
     const selectedIndex = getSelectedUpdateImageIndex(day.id);
     const selectedImage = images[selectedIndex];
+    const previewSrc = getUpdateImageDisplaySrc(selectedImage);
+    const fullSrc = selectedImage.src;
+    const shouldRebuildStage = updateModalStage.dataset.updateDayId !== day.id
+        || updateModalStage.dataset.imageCount !== String(images.length)
+        || !updateModalStage.querySelector(".update-modal-main-frame");
 
-    updateModalStage.innerHTML = buildUpdateStageMarkup(selectedImage, selectedIndex, images.length, dayTitle, "update-modal-main-frame");
-    updateModalThumbStrip.innerHTML = images.map((image, index) => `
-        <button
-            class="update-thumb-item ${index === selectedIndex ? "is-selected" : ""}"
-            type="button"
-            data-update-modal-thumb="true"
-            data-image-index="${index}"
-            aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
-            aria-pressed="${index === selectedIndex ? "true" : "false"}"
-        >
-            <img src="${image.src}" alt="${image.alt}">
-        </button>
-    `).join("");
+    if (shouldRebuildStage) {
+        updateModalStage.innerHTML = buildUpdateStageMarkup(
+            selectedImage,
+            selectedIndex,
+            images.length,
+            dayTitle,
+            "update-modal-main-frame",
+            { useCachedDisplay: Boolean(selectedImage._cachedUrl) }
+        );
+        updateModalStage.dataset.updateDayId = day.id;
+        updateModalStage.dataset.imageCount = String(images.length);
+    }
+
+    const modalFrame = updateModalStage.querySelector(".update-modal-main-frame");
+    const modalBg = updateModalStage.querySelector(".update-main-bg-image");
+    const modalImg = updateModalStage.querySelector(".update-main-img");
+    const modalCounter = updateModalStage.querySelector(".update-main-counter");
+
+    if (modalFrame) {
+        modalFrame.setAttribute("aria-label", formatText(siteData.ui.updates.mainFrameAria, { title: dayTitle }));
+    }
+    if (modalCounter) {
+        modalCounter.textContent = `${selectedIndex + 1} / ${images.length}`;
+    }
+    if (modalImg) {
+        modalImg.alt = selectedImage.alt || "";
+    }
+
+    applyModalStageImage(modalBg, modalImg, selectedImage, selectedIndex, {
+        preferCached: Boolean(selectedImage._cachedUrl)
+    });
+
+    if (!selectedImage._cachedUrl && previewSrc !== fullSrc) {
+        getCachedImageUrl(fullSrc).then((cachedUrl) => {
+            selectedImage._cachedUrl = cachedUrl;
+
+            if (!modalImg || modalImg.dataset.imageIndex !== String(selectedIndex)) {
+                return;
+            }
+
+            window.requestAnimationFrame(() => {
+                applyModalStageImage(modalBg, modalImg, selectedImage, selectedIndex, {
+                    preferCached: true
+                });
+            });
+        });
+    }
+
+    const activeIndex = selectedIndex;
+    const imageSignature = images.map((image) => `${image.src || ""}|${image.thumbSrc || ""}|${image.alt || ""}`).join("::");
+    const shouldRebuildStrip = updateModalThumbStrip.dataset.updateDayId !== day.id
+        || updateModalThumbStrip.dataset.imageSignature !== imageSignature;
+
+    if (shouldRebuildStrip) {
+        updateModalThumbStrip.innerHTML = images.map((image, index) => `
+            <button
+                class="update-thumb-item ${index === activeIndex ? "is-selected" : ""}"
+                type="button"
+                data-update-modal-thumb="true"
+                data-image-index="${index}"
+                aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
+                aria-pressed="${index === activeIndex ? "true" : "false"}"
+            >
+                <img src="${image.thumbSrc || image.src}"${getUpdateResponsiveAttributes(image, "thumb")} alt="${image.alt}" loading="lazy" decoding="async">
+            </button>
+        `).join("");
+        updateModalThumbStrip.dataset.updateDayId = day.id;
+        updateModalThumbStrip.dataset.imageSignature = imageSignature;
+    } else {
+        updateModalThumbStrip.querySelectorAll("[data-update-modal-thumb]").forEach((button) => {
+            const isSelected = Number(button.dataset.imageIndex) === activeIndex;
+            button.classList.toggle("is-selected", isSelected);
+            button.setAttribute("aria-pressed", String(isSelected));
+            button.setAttribute("aria-label", formatText(siteData.ui.updates.thumbAria, {
+                index: Number(button.dataset.imageIndex) + 1,
+                title: dayTitle
+            }));
+        });
+    }
 
     syncUpdateSlideBackgrounds();
-    bindUpdateModalEvents();
+    bindUpdateModalEvents({ rebindThumbs: shouldRebuildStrip });
+    restoreStripScroll(updateModalThumbStrip, updateModalThumbStripScroll[day.id]);
+    window.requestAnimationFrame(() => {
+        const selectedThumb = updateModalThumbStrip.querySelector(".is-selected");
+        if (selectedThumb) {
+            selectedThumb.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        }
+    });
 }
 
 function shouldRefreshUpdateImages(updateId) {
@@ -556,38 +1096,115 @@ function shouldRefreshUpdateImages(updateId) {
     return !state.loadedAt || Date.now() - state.loadedAt >= UPDATE_REFRESH_MS;
 }
 
+function haveSameUpdateImages(previousImages, nextImages) {
+    if (previousImages.length !== nextImages.length) {
+        return false;
+    }
+
+    return previousImages.every((image, index) => {
+        const nextImage = nextImages[index];
+        return nextImage
+            && image.src === nextImage.src
+            && (image.thumbSrc || "") === (nextImage.thumbSrc || "")
+            && (image.name || "") === (nextImage.name || "")
+            && (image.filename || "") === (nextImage.filename || "")
+            && (image.alt || "") === (nextImage.alt || "")
+            && (image.createdTime || "") === (nextImage.createdTime || "");
+    });
+}
+
 async function fetchUpdateImages(updateId, { force = false } = {}) {
     const day = siteData.dailyUpdates.find((entry) => entry.id === updateId);
     const state = getUpdateGalleryState(updateId);
+    const previousImages = Array.isArray(state.images) ? state.images : [];
+    const hadExistingImages = previousImages.length > 0;
 
     if ((!day?.folderId && !day?.albumUrl) || state.status === "loading" || (!force && state.status === "ready" && !shouldRefreshUpdateImages(updateId))) {
         return;
     }
 
     state.status = "loading";
-    if (currentUpdateId === updateId) {
+    if (currentUpdateId === updateId && !hadExistingImages) {
         renderUpdatePanel();
         bindGalleryControlEvents();
-        updateRevealVisibility();
     }
 
     try {
         const query = day.albumUrl
             ? `albumUrl=${encodeURIComponent(day.albumUrl)}`
             : `folderId=${encodeURIComponent(day.folderId)}`;
-        const response = await fetch(`/api/funeral-day-gallery?${query}`, {
-            cache: "no-store"
-        });
+        const timeBucket = getUpdateTimeBucket();
+        const cachedSession = !force ? readUpdateSessionCache(updateId, query, timeBucket) : null;
+        if (cachedSession) {
+            const cachedImages = cachedSession.images;
+            const didImagesChange = !haveSameUpdateImages(previousImages, cachedImages);
+            state.images = didImagesChange ? cachedImages : previousImages;
+            state.status = "ready";
+            state.loadedAt = cachedSession.cachedAt || Date.now();
+            state.lastRefreshHadChanges = didImagesChange;
+            const startIndex = updateSelectedImageIndex[updateId] ?? 0;
+            scheduleSmartPreload(state.images, startIndex);
+            getSelectedUpdateImageIndex(updateId);
+
+            if (currentUpdateId === updateId && state.lastRefreshHadChanges) {
+                if (updateModalOpen) {
+                    state.pendingRender = true;
+                    state.pendingPreviousImages = state.pendingPreviousImages || previousImages.slice();
+                } else if (!hadExistingImages) {
+                    renderUpdatePanel();
+                    bindGalleryControlEvents();
+                } else {
+                    appendNewUpdatePhotos(updateId, previousImages);
+                }
+            }
+
+            return;
+        }
+        const response = await fetch(`/api/funeral-day-gallery?${query}&t=${timeBucket}`);
 
         if (!response.ok) {
             throw new Error(`Request failed with ${response.status}`);
         }
 
         const payload = await response.json();
-        state.images = Array.isArray(payload.images) ? payload.images : [];
+        const raw = Array.isArray(payload.images) ? payload.images : [];
+        const nextImages = raw.slice().sort((a, b) => {
+            if (a.createdTime && b.createdTime) {
+                return new Date(a.createdTime) - new Date(b.createdTime);
+            }
+
+            const nameA = (a.name || a.filename || a.alt || "").toLowerCase();
+            const nameB = (b.name || b.filename || b.alt || "").toLowerCase();
+
+            if (nameA && nameB) {
+                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+            }
+
+            return 0;
+        });
+        const didImagesChange = !haveSameUpdateImages(previousImages, nextImages);
+        state.images = didImagesChange ? nextImages : previousImages;
         state.status = "ready";
         state.loadedAt = Date.now();
+        state.lastRefreshHadChanges = didImagesChange;
+        writeUpdateSessionCache(updateId, query, timeBucket, state.images);
+        const startIndex = updateSelectedImageIndex[updateId] ?? 0;
+        scheduleSmartPreload(state.images, startIndex);
         getSelectedUpdateImageIndex(updateId);
+
+        if (currentUpdateId === updateId && state.lastRefreshHadChanges) {
+            if (updateModalOpen) {
+                state.pendingRender = true;
+                state.pendingPreviousImages = state.pendingPreviousImages || previousImages.slice();
+            } else if (!hadExistingImages) {
+                renderUpdatePanel();
+                bindGalleryControlEvents();
+            } else {
+                appendNewUpdatePhotos(updateId, previousImages);
+            }
+        }
+
+        return;
     } catch (error) {
         state.images = [];
         state.status = "error";
@@ -604,11 +1221,39 @@ async function fetchUpdateImages(updateId, { force = false } = {}) {
 }
 
 function primeUpdateImages() {
-    siteData.dailyUpdates.forEach((day) => {
-        fetchUpdateImages(day.id).catch((error) => {
-            console.error("Unable to prime daily photo folder", day.id, error);
+    const section = updatePanel?.closest("section") || updatePanel?.parentElement;
+    if (!section) {
+        fetchUpdateImages(currentUpdateId).catch((error) => {
+            console.error("Unable to prime daily photo folder", currentUpdateId, error);
         });
-    });
+        return;
+    }
+
+    updateImagesPrimeObserver?.disconnect();
+    updateImagesPrimeObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (!entry.isIntersecting) {
+                return;
+            }
+
+            updateImagesPrimeObserver?.disconnect();
+            updateImagesPrimeObserver = null;
+
+            fetchUpdateImages(currentUpdateId).catch((error) => {
+                console.error("Unable to prime daily photo folder", currentUpdateId, error);
+            });
+
+            siteData.dailyUpdates.forEach((day, index) => {
+                if (day.id === currentUpdateId) {
+                    return;
+                }
+
+                scheduleIdleUpdatePrime(day.id, (index + 1) * 250);
+            });
+        });
+    }, { rootMargin: "200px" });
+
+    updateImagesPrimeObserver.observe(section);
 }
 
 function renderGalleryFilters() {
@@ -690,9 +1335,17 @@ function bindTabEvents() {
             renderUpdatePanel();
             bindTabEvents();
             updateRevealVisibility();
-            fetchUpdateImages(currentUpdateId).catch((error) => {
-                console.error("Unable to refresh daily photo folder", currentUpdateId, error);
-            });
+            window.clearTimeout(tabSwitchTimer);
+            tabSwitchTimer = window.setTimeout(() => {
+                fetchUpdateImages(currentUpdateId).catch((error) => {
+                    console.error("Unable to refresh daily photo folder", currentUpdateId, error);
+                });
+            }, 300);
+
+            const tabImages = getUpdateImages(currentUpdateId);
+            if (tabImages.length) {
+                scheduleSmartPreload(tabImages, getSelectedUpdateImageIndex(currentUpdateId));
+            }
         });
     });
 }
@@ -718,6 +1371,18 @@ function startUpdateRefresh() {
         });
     }, UPDATE_REFRESH_MS);
 }
+
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        stopUpdateRefresh();
+        return;
+    }
+
+    startUpdateRefresh();
+    fetchUpdateImages(currentUpdateId, { force: true }).catch((error) => {
+        console.error("Unable to refresh daily photo folder", currentUpdateId, error);
+    });
+});
 
 function bindFilterEvents() {
     galleryFilters.querySelectorAll(".chip").forEach((button) => {
@@ -974,6 +1639,11 @@ function openUpdateModal() {
         return;
     }
 
+    const mainStrip = document.getElementById("updateThumbStrip");
+    if (mainStrip) {
+        rememberUpdateThumbStripScroll(currentUpdateId, mainStrip.scrollLeft);
+    }
+
     updateModalOpen = true;
     renderUpdateModal();
     updateModal.classList.add("is-open");
@@ -986,6 +1656,32 @@ function closeUpdateModal() {
     updateModal.classList.remove("is-open");
     updateModal.setAttribute("aria-hidden", "true");
     document.body.style.overflow = lightbox.classList.contains("is-open") ? "hidden" : "";
+
+    const state = getUpdateGalleryState(currentUpdateId);
+    if (state.pendingRender) {
+        const previousImages = Array.isArray(state.pendingPreviousImages) ? state.pendingPreviousImages : [];
+        state.pendingRender = false;
+        state.pendingPreviousImages = null;
+
+        if (previousImages.length === 0) {
+            renderUpdatePanel();
+            bindGalleryControlEvents();
+            return;
+        }
+
+        appendNewUpdatePhotos(currentUpdateId, previousImages);
+    }
+}
+
+function syncUpdatePanelSelection(images, index) {
+    const mainImg = updatePanel.querySelector(".update-main-img");
+    const thumbStrip = document.getElementById("updateThumbStrip");
+
+    if (!mainImg || !thumbStrip) {
+        return;
+    }
+
+    updateMainPhoto(images, index);
 }
 
 function bindUpdatePanelEvents() {
@@ -993,7 +1689,19 @@ function bindUpdatePanelEvents() {
     const thumbStrip = document.getElementById("updateThumbStrip");
 
     mainFrame?.addEventListener("click", openUpdateModal);
+    if (thumbStrip && thumbStrip.dataset.boundScroll !== "true") {
+        thumbStrip.dataset.boundScroll = "true";
+        thumbStrip.addEventListener("scroll", () => {
+            rememberUpdateThumbStripScroll(currentUpdateId, thumbStrip.scrollLeft);
+        }, { passive: true });
+    }
+
     thumbStrip?.querySelectorAll("[data-update-thumb]").forEach((button) => {
+        if (button.dataset.boundClick === "true") {
+            return;
+        }
+
+        button.dataset.boundClick = "true";
         button.addEventListener("click", () => {
             const index = Number(button.dataset.imageIndex);
             setSelectedUpdateImageIndex(currentUpdateId, index);
@@ -1010,26 +1718,48 @@ function bindUpdatePanelEvents() {
     bindThumbStripDrag(thumbStrip);
 }
 
-function bindUpdateModalEvents() {
-    updateModalClose?.addEventListener("click", closeUpdateModal);
-    updateModal?.addEventListener("click", (event) => {
-        if (event.target === updateModal) {
-            closeUpdateModal();
-        }
-    });
-
-    updateModalThumbStrip?.querySelectorAll("[data-update-modal-thumb]").forEach((button) => {
-        button.addEventListener("click", () => {
-            setSelectedUpdateImageIndex(currentUpdateId, Number(button.dataset.imageIndex));
-            renderUpdatePanel();
-            renderUpdateModal();
-            renderLucideIcons();
-            window.setTimeout(() => {
-                const selected = updateModalThumbStrip?.querySelector(".is-selected");
-                selected?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-            }, 50);
+function bindUpdateModalEvents({ rebindThumbs = true } = {}) {
+    if (updateModalClose && updateModalClose.dataset.boundClick !== "true") {
+        updateModalClose.dataset.boundClick = "true";
+        updateModalClose.addEventListener("click", closeUpdateModal);
+    }
+    if (updateModal && updateModal.dataset.boundClick !== "true") {
+        updateModal.dataset.boundClick = "true";
+        updateModal.addEventListener("click", (event) => {
+            if (event.target === updateModal) {
+                closeUpdateModal();
+            }
         });
-    });
+    }
+
+    if (updateModalThumbStrip && updateModalThumbStrip.dataset.boundScroll !== "true") {
+        updateModalThumbStrip.dataset.boundScroll = "true";
+        updateModalThumbStrip.addEventListener("scroll", () => {
+            rememberUpdateModalThumbStripScroll(currentUpdateId, updateModalThumbStrip.scrollLeft);
+        }, { passive: true });
+    }
+
+    if (rebindThumbs) {
+        updateModalThumbStrip?.querySelectorAll("[data-update-modal-thumb]").forEach((button) => {
+            button.addEventListener("click", () => {
+                rememberUpdateModalThumbStripScroll(currentUpdateId, updateModalThumbStrip?.scrollLeft || 0);
+                const nextIndex = Number(button.dataset.imageIndex);
+                setSelectedUpdateImageIndex(currentUpdateId, nextIndex);
+                syncUpdatePanelSelection(getUpdateImages(currentUpdateId), nextIndex);
+                renderUpdateModal();
+                renderLucideIcons();
+                window.setTimeout(() => {
+                    const selected = updateModalThumbStrip?.querySelector(".is-selected");
+                    selected?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }, 50);
+
+                window.setTimeout(() => {
+                    const mainSelected = document.getElementById("updateThumbStrip")?.querySelector(".is-selected");
+                    mainSelected?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }, 50);
+            });
+        });
+    }
 
     bindThumbStripDrag(updateModalThumbStrip);
 }
@@ -1062,10 +1792,8 @@ function shuffleArray(items) {
 }
 
 function bindLanguageEvents() {
-    languageToggle.querySelectorAll("[data-language]").forEach((button) => {
-        button.addEventListener("click", () => {
-            setLanguage(button.dataset.language);
-        });
+    languageToggleButton.addEventListener("click", () => {
+        setLanguage(languageToggleButton.dataset.language);
     });
 }
 
@@ -1116,15 +1844,29 @@ function bindEvents() {
             }
 
             if (event.key === "ArrowLeft") {
-                setSelectedUpdateImageIndex(currentUpdateId, getSelectedUpdateImageIndex(currentUpdateId) - 1);
-                renderUpdatePanel();
+                rememberUpdateModalThumbStripScroll(currentUpdateId, updateModalThumbStrip?.scrollLeft || 0);
+                const nextIndex = getSelectedUpdateImageIndex(currentUpdateId) - 1;
+                setSelectedUpdateImageIndex(currentUpdateId, nextIndex);
+                syncUpdatePanelSelection(getUpdateImages(currentUpdateId), getSelectedUpdateImageIndex(currentUpdateId));
+                renderUpdateModal();
                 renderLucideIcons();
+                window.setTimeout(() => {
+                    document.getElementById("updateThumbStrip")?.querySelector(".is-selected")
+                        ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }, 50);
             }
 
             if (event.key === "ArrowRight") {
-                setSelectedUpdateImageIndex(currentUpdateId, getSelectedUpdateImageIndex(currentUpdateId) + 1);
-                renderUpdatePanel();
+                rememberUpdateModalThumbStripScroll(currentUpdateId, updateModalThumbStrip?.scrollLeft || 0);
+                const nextIndex = getSelectedUpdateImageIndex(currentUpdateId) + 1;
+                setSelectedUpdateImageIndex(currentUpdateId, nextIndex);
+                syncUpdatePanelSelection(getUpdateImages(currentUpdateId), getSelectedUpdateImageIndex(currentUpdateId));
+                renderUpdateModal();
                 renderLucideIcons();
+                window.setTimeout(() => {
+                    document.getElementById("updateThumbStrip")?.querySelector(".is-selected")
+                        ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }, 50);
             }
 
             return;
@@ -1169,7 +1911,7 @@ function renderSite() {
     renderTimeline();
     renderLifeStory();
     renderUpdateTabs();
-    renderUpdatePanel();
+    renderUpdatePanelText();
     renderGalleryContribution();
     renderGalleryFilters();
     renderGallery();

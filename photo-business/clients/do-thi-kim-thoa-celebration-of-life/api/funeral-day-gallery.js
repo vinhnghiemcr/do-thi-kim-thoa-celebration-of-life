@@ -2,6 +2,8 @@ const DRIVE_FOLDER_URL = "https://drive.google.com/embeddedfolderview";
 const DRIVE_FILE_URL_RE = /\/file\/d\/([A-Za-z0-9_-]+)/;
 const ENTRY_RE = /<div class="flip-entry"[\s\S]*?<a href="([^"]+)"[\s\S]*?<img src="([^"]+)" alt="([^"]*)"[\s\S]*?<div class="flip-entry-title">([\s\S]*?)<\/div>/g;
 const GOOGLE_PHOTOS_IMAGE_RE = /https:\/\/lh3\.googleusercontent\.com\/pw\/[^"'\\\s<>)]+/g;
+const VIEWER_SIZES = "(max-width: 768px) 92vw, (max-width: 1200px) 86vw, 1200px";
+const THUMB_SIZES = "(max-width: 768px) 96px, 112px";
 
 function decodeHtml(value) {
     return String(value || "")
@@ -21,6 +23,40 @@ function isDefaultPlaceholder(name) {
     return /^default[-_]/i.test(String(name || ""));
 }
 
+function buildSrcSet(urlBuilder, widths) {
+    return widths.map((width) => `${urlBuilder(width)} ${width}w`).join(", ");
+}
+
+function buildDriveImageVariants(fileId) {
+    const driveUrl = (width) => `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
+    const driveThumbUrl = (width) => `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
+
+    return {
+        src: driveUrl(2000),
+        displaySrc: driveUrl(1280),
+        thumbSrc: driveThumbUrl(320),
+        viewerSrcSet: buildSrcSet(driveUrl, [640, 960, 1280, 1600, 2000]),
+        viewerSizes: VIEWER_SIZES,
+        thumbSrcSet: buildSrcSet(driveThumbUrl, [160, 240, 320, 480]),
+        thumbSizes: THUMB_SIZES
+    };
+}
+
+function buildGooglePhotoImageVariants(baseUrl) {
+    const viewerUrl = (width) => `${baseUrl}=w${width}`;
+    const thumbUrl = (width) => `${baseUrl}=w${width}-h${Math.round(width * 0.75)}-p-k-no`;
+
+    return {
+        src: viewerUrl(2000),
+        displaySrc: viewerUrl(1280),
+        thumbSrc: thumbUrl(320),
+        viewerSrcSet: buildSrcSet(viewerUrl, [640, 960, 1280, 1600, 2000]),
+        viewerSizes: VIEWER_SIZES,
+        thumbSrcSet: buildSrcSet(thumbUrl, [160, 240, 320, 480]),
+        thumbSizes: THUMB_SIZES
+    };
+}
+
 function extractImages(html) {
     const images = [];
     const matches = html.matchAll(ENTRY_RE);
@@ -37,9 +73,13 @@ function extractImages(html) {
         }
 
         const caption = toCaption(title);
+        const variants = buildDriveImageVariants(fileId);
         images.push({
-            src: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`,
-            thumbSrc,
+            ...variants,
+            thumbSrc: thumbSrc || variants.thumbSrc,
+            name: title,
+            filename: title,
+            createdTime: null,
             alt: caption || alt || "Funeral day photo",
             caption: caption || "Shared from the funeral day folder."
         });
@@ -66,8 +106,10 @@ function extractAlbumImages(html) {
 
         seen.add(baseUrl);
         images.push({
-            src: `${baseUrl}=w1600`,
-            thumbSrc: `${baseUrl}=w320-h240-p-k-no`,
+            ...buildGooglePhotoImageVariants(baseUrl),
+            name: "",
+            filename: "",
+            createdTime: null,
             alt: "Vietnam memorial photo",
             caption: "Shared from the Vietnam memorial album."
         });
@@ -120,7 +162,7 @@ module.exports = async (req, res) => {
             ? extractAlbumImages(await fetchAlbumHtml(albumUrl))
             : extractImages(await fetchFolderHtml(folderId));
 
-        res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
+        res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60, stale-while-revalidate=300");
         res.status(200).json({ images });
     } catch (error) {
         res.status(502).json({
