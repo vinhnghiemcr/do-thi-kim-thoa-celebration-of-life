@@ -46,9 +46,11 @@ function buildDriveImageVariants(fileId) {
 
 function buildDriveVideoVariants(fileId, posterSrc = "") {
     const directUrl = `https://drive.google.com/uc?id=${fileId}`;
+    const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
 
     return {
         src: directUrl,
+        embedSrc: embedUrl,
         displaySrc: posterSrc,
         thumbSrc: null,
         viewerSrcSet: "",
@@ -158,6 +160,7 @@ function extractAlbumItems(html) {
         seen.add(baseUrl);
         items.push({
             src: `${baseUrl}=m37`,
+            embedSrc: null,
             displaySrc: `${baseUrl}=w1280`,
             thumbSrc: `${baseUrl}=w320-h240-p-k-no`,
             posterSrc: `${baseUrl}=w640`,
@@ -190,6 +193,7 @@ function extractAlbumItems(html) {
         seen.add(baseUrl);
         items.push({
             src: `${baseUrl}=m37`,
+            embedSrc: null,
             displaySrc: `${baseUrl}=w1280`,
             thumbSrc: `${baseUrl}=w320-h240-p-k-no`,
             posterSrc: `${baseUrl}=w640`,

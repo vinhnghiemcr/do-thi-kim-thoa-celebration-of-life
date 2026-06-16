@@ -309,6 +309,7 @@ function writeUpdateSessionCache(updateId, query, timeBucket, images) {
                 items: images.map((image) => ({
                     type: image.type || "image",
                     src: image.src,
+                    embedSrc: image.embedSrc || null,
                     displaySrc: image.displaySrc,
                     thumbSrc: image.thumbSrc,
                     posterSrc: image.posterSrc,
@@ -695,6 +696,16 @@ function buildUpdateStageMarkup(image, index, total, title, className, { useCach
     const backgroundSrc = isVideo ? (image.posterSrc || previewSrc || image.src) : displaySrc;
     const isMainFrame = className === "update-main-frame";
     const interactiveAttrs = isMainFrame && !isVideo ? 'role="button" tabindex="0"' : "";
+    const openVideoModalButton = isMainFrame && isVideo ? `
+        <button
+            class="update-open-modal"
+            type="button"
+            data-update-open-modal
+            aria-label="${escapeHtmlAttribute(formatText(siteData.ui.updates.mainFrameAria, { title }))}"
+        >
+            <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+        </button>
+    ` : "";
     return `
         <div
             class="${className}${isVideo ? " is-video" : ""}"
@@ -720,6 +731,7 @@ function buildUpdateStageMarkup(image, index, total, title, className, { useCach
                     <img class="update-main-img" src="${displaySrc}"${getUpdateResponsiveAttributes(image, "viewer")} data-full-src="${image.src}" data-image-index="${index}" alt="${escapeHtmlAttribute(image.alt || "")}" decoding="async">
                 `}
             </div>
+            ${openVideoModalButton}
             <span class="update-main-counter">${index + 1} / ${total}</span>
         </div>
     `;
@@ -746,6 +758,7 @@ function updateMainPhoto(images, index) {
             mainFrame.replaceWith(newFrame);
         }
         bindUpdatePanelEvents();
+        renderLucideIcons();
     }
 
     const nextMainBg = updatePanel.querySelector(".update-main-bg-image");
@@ -1124,6 +1137,7 @@ function haveSameUpdateImages(previousImages, nextImages) {
         return nextImage
             && (image.type || "image") === (nextImage.type || "image")
             && image.src === nextImage.src
+            && (image.embedSrc || "") === (nextImage.embedSrc || "")
             && (image.thumbSrc || "") === (nextImage.thumbSrc || "")
             && (image.posterSrc || "") === (nextImage.posterSrc || "")
             && (image.name || "") === (nextImage.name || "")
@@ -1681,7 +1695,8 @@ function updateRevealVisibility() {
 }
 
 function openUpdateModal() {
-    if (!getUpdateImages(currentUpdateId).length) {
+    const images = getUpdateImages(currentUpdateId);
+    if (!images.length) {
         return;
     }
 
@@ -1736,11 +1751,23 @@ function syncUpdatePanelSelection(images, index) {
 function bindUpdatePanelEvents() {
     const mainFrame = document.querySelector(".update-main-frame");
     const thumbStrip = document.getElementById("updateThumbStrip");
+    const openModalButton = mainFrame?.querySelector("[data-update-open-modal]");
+
+    if (openModalButton && openModalButton.dataset.boundClick !== "true") {
+        openModalButton.dataset.boundClick = "true";
+        openModalButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            openUpdateModal();
+        });
+    }
 
     if (mainFrame && mainFrame.dataset.boundClick !== "true") {
         mainFrame.dataset.boundClick = "true";
         mainFrame.addEventListener("click", (event) => {
-            if (event.target instanceof Element && event.target.closest("video")) {
+            if (
+                mainFrame.dataset.mediaType === "video"
+                || (event.target instanceof Element && event.target.closest("video"))
+            ) {
                 return;
             }
 
@@ -1818,7 +1845,10 @@ function bindUpdateModalEvents({ rebindThumbs = true } = {}) {
                 rememberUpdateModalThumbStripScroll(currentUpdateId, updateModalThumbStrip?.scrollLeft || 0);
                 const nextIndex = Number(button.dataset.imageIndex);
                 setSelectedUpdateImageIndex(currentUpdateId, nextIndex);
-                syncUpdatePanelSelection(getUpdateImages(currentUpdateId), nextIndex);
+                const images = getUpdateImages(currentUpdateId);
+
+                syncUpdatePanelSelection(images, nextIndex);
+
                 renderUpdateModal();
                 renderLucideIcons();
                 window.setTimeout(() => {
