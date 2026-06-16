@@ -773,6 +773,11 @@ button {
     cursor: pointer;
 }
 
+.update-main-frame.is-video,
+.update-modal-main-frame.is-video {
+    cursor: default;
+}
+
 .update-main-background,
 .update-main-foreground {
     position: absolute;
@@ -815,6 +820,18 @@ button {
     max-height: 100%;
     transform: translate(-50%, -50%);
     object-fit: contain;
+}
+
+.update-main-foreground video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(100%, 1000px);
+    max-width: 100%;
+    max-height: 100%;
+    transform: translate(-50%, -50%);
+    object-fit: contain;
+    background: #000;
 }
 
 .update-main-counter {
@@ -909,6 +926,25 @@ button {
     border-color: #ffffff !important;
     opacity: 1;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.update-thumb-item.is-video {
+    position: relative;
+}
+
+.thumb-play-icon {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+}
+
+.thumb-play-icon svg {
+    width: 28px;
+    height: 28px;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
 }
 
 .gallery-slideshow {
@@ -1307,11 +1343,24 @@ button {
     justify-self: center;
 }
 
-.lightbox-figure img {
+#lightboxMedia {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 1px;
+}
+
+#lightboxMedia img,
+#lightboxMedia video {
     max-height: 72vh;
     width: 100%;
     object-fit: contain;
     border-radius: 1.25rem;
+}
+
+#lightboxMedia video {
+    background: #000;
 }
 
 .lightbox-figure figcaption {

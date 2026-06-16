@@ -65,7 +65,7 @@ const updateModalThumbStrip = document.getElementById("updateModalThumbStrip");
 const updateModalClose = document.getElementById("updateModalClose");
 
 const lightbox = document.getElementById("lightbox");
-const lightboxImage = document.getElementById("lightboxImage");
+const lightboxMedia = document.getElementById("lightboxMedia");
 const lightboxMeta = document.getElementById("lightboxMeta");
 const lightboxCaption = document.getElementById("lightboxCaption");
 const lightboxClose = document.getElementById("lightboxClose");
@@ -116,6 +116,7 @@ const UPDATE_REFRESH_MS = 60 * 1000;
 const UPDATE_VIEWER_SIZES = "(max-width: 768px) 92vw, (max-width: 1200px) 86vw, 1200px";
 const UPDATE_THUMB_SIZES = "(max-width: 768px) 96px, 112px";
 const UPDATE_SESSION_CACHE_PREFIX = "memorial-update-gallery";
+const VIDEO_FILE_EXT_RE = /\.(mp4|mov|avi|mkv|webm|3gp)$/i;
 
 async function getCachedImageUrl(src) {
     if (!src) {
@@ -194,11 +195,13 @@ function scheduleSmartPreload(images, selectedIndex) {
     preloadQueue.length = 0;
 
     const selected = images[selectedIndex];
-    if (selected?.src) {
+    if (selected?.src && !isVideoItem(selected)) {
         enqueuePreload(selected.src, 0);
     }
 
-    const selectedDisplay = selected?.displaySrc || selected?.thumbSrc;
+    const selectedDisplay = isVideoItem(selected)
+        ? (selected?.posterSrc || selected?.thumbSrc)
+        : (selected?.displaySrc || selected?.thumbSrc);
     if (selectedDisplay && selectedDisplay !== selected?.src) {
         enqueuePreload(selectedDisplay, 0);
     }
@@ -207,11 +210,11 @@ function scheduleSmartPreload(images, selectedIndex) {
         const prev = images[selectedIndex - offset];
         const next = images[selectedIndex + offset];
 
-        if (prev?.thumbSrc) {
-            enqueuePreload(prev.thumbSrc, 1);
+        if (getUpdateThumbSrc(prev)) {
+            enqueuePreload(getUpdateThumbSrc(prev), 1);
         }
-        if (next?.thumbSrc) {
-            enqueuePreload(next.thumbSrc, 1);
+        if (getUpdateThumbSrc(next)) {
+            enqueuePreload(getUpdateThumbSrc(next), 1);
         }
     }
 
@@ -219,10 +222,10 @@ function scheduleSmartPreload(images, selectedIndex) {
         const prev = images[selectedIndex - offset];
         const next = images[selectedIndex + offset];
 
-        if (prev?.src) {
+        if (prev?.src && !isVideoItem(prev)) {
             enqueuePreload(prev.src, 2);
         }
-        if (next?.src) {
+        if (next?.src && !isVideoItem(next)) {
             enqueuePreload(next.src, 2);
         }
     }
@@ -236,11 +239,27 @@ function escapeHtmlAttribute(value) {
         .replace(/>/g, "&gt;");
 }
 
+function isVideoItem(item) {
+    return item?.type === "video"
+        || VIDEO_FILE_EXT_RE.test(item?.src || "")
+        || VIDEO_FILE_EXT_RE.test(item?.name || item?.filename || "");
+}
+
+function getUpdateThumbSrc(image) {
+    return isVideoItem(image)
+        ? (image?.posterSrc || image?.thumbSrc || image?.displaySrc || image?.src || "")
+        : (image?.thumbSrc || image?.displaySrc || image?.src || "");
+}
+
 function getUpdateImageDisplaySrc(image) {
-    return image?.displaySrc || image?.thumbSrc || image?.src || "";
+    return image?.displaySrc || image?.posterSrc || image?.thumbSrc || image?.src || "";
 }
 
 function getUpdateResponsiveAttributes(image, kind = "viewer") {
+    if (isVideoItem(image)) {
+        return "";
+    }
+
     const srcSet = kind === "thumb" ? image?.thumbSrcSet : image?.viewerSrcSet;
     const sizes = kind === "thumb"
         ? (image?.thumbSizes || UPDATE_THUMB_SIZES)
@@ -265,7 +284,18 @@ function readUpdateSessionCache(updateId, query, timeBucket) {
         }
 
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed?.images) ? parsed : null;
+        if (Array.isArray(parsed?.items)) {
+            return parsed;
+        }
+
+        if (Array.isArray(parsed?.images)) {
+            return {
+                items: parsed.images,
+                cachedAt: parsed.cachedAt || Date.now()
+            };
+        }
+
+        return null;
     } catch {
         return null;
     }
@@ -276,10 +306,12 @@ function writeUpdateSessionCache(updateId, query, timeBucket, images) {
         window.sessionStorage.setItem(
             getUpdateSessionCacheKey(updateId, query, timeBucket),
             JSON.stringify({
-                images: images.map((image) => ({
+                items: images.map((image) => ({
+                    type: image.type || "image",
                     src: image.src,
                     displaySrc: image.displaySrc,
                     thumbSrc: image.thumbSrc,
+                    posterSrc: image.posterSrc,
                     viewerSrcSet: image.viewerSrcSet,
                     viewerSizes: image.viewerSizes,
                     thumbSrcSet: image.thumbSrcSet,
@@ -287,6 +319,7 @@ function writeUpdateSessionCache(updateId, query, timeBucket, images) {
                     name: image.name,
                     filename: image.filename,
                     createdTime: image.createdTime,
+                    mimeType: image.mimeType || null,
                     alt: image.alt,
                     caption: image.caption
                 })),
@@ -579,6 +612,40 @@ function syncUpdateSlideBackgrounds() {
     });
 }
 
+function buildVideoPlayIconMarkup() {
+    return `
+        <span class="thumb-play-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="none">
+                <circle cx="12" cy="12" r="12" fill="rgba(0,0,0,0.5)"></circle>
+                <polygon points="10,8 16,12 10,16" fill="white"></polygon>
+            </svg>
+        </span>
+    `;
+}
+
+function buildUpdateThumbMarkup(image, index, dayTitle, {
+    selected = false,
+    dataAttr = "data-update-thumb",
+    thumbClass = "update-thumb-item"
+} = {}) {
+    const thumbSrc = getUpdateThumbSrc(image);
+    const responsiveAttrs = isVideoItem(image) ? "" : getUpdateResponsiveAttributes(image, "thumb");
+
+    return `
+        <button
+            class="${thumbClass}${isVideoItem(image) ? " is-video" : ""}${selected ? " is-selected" : ""}"
+            type="button"
+            ${dataAttr}="true"
+            data-image-index="${index}"
+            aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
+            aria-pressed="${selected ? "true" : "false"}"
+        >
+            <img src="${thumbSrc}"${responsiveAttrs} alt="${escapeHtmlAttribute(image.alt || "")}" loading="lazy" decoding="async">
+            ${isVideoItem(image) ? buildVideoPlayIconMarkup() : ""}
+        </button>
+    `;
+}
+
 function getSelectedUpdateImageIndex(updateId) {
     const images = getUpdateImages(updateId);
 
@@ -622,22 +689,39 @@ function restoreStripScroll(strip, scrollLeft) {
 }
 
 function buildUpdateStageMarkup(image, index, total, title, className, { useCachedDisplay = false } = {}) {
+    const isVideo = isVideoItem(image);
     const previewSrc = getUpdateImageDisplaySrc(image);
-    const displaySrc = useCachedDisplay ? (image._cachedUrl || image.src) : previewSrc;
+    const displaySrc = !isVideo && useCachedDisplay ? (image._cachedUrl || image.src) : previewSrc;
+    const backgroundSrc = isVideo ? (image.posterSrc || previewSrc || image.src) : displaySrc;
+    const isMainFrame = className === "update-main-frame";
+    const interactiveAttrs = isMainFrame && !isVideo ? 'role="button" tabindex="0"' : "";
     return `
-        <button
-            class="${className}"
-            type="button"
+        <div
+            class="${className}${isVideo ? " is-video" : ""}"
             aria-label="${formatText(siteData.ui.updates.mainFrameAria, { title })}"
+            data-media-type="${isVideo ? "video" : "image"}"
+            ${interactiveAttrs}
         >
             <div class="update-main-background" aria-hidden="true">
-                <img class="update-main-bg-image" src="${displaySrc}"${getUpdateResponsiveAttributes(image, "viewer")} data-full-src="${image.src}" alt="" decoding="async">
+                <img class="update-main-bg-image" src="${backgroundSrc}"${isVideo ? "" : getUpdateResponsiveAttributes(image, "viewer")} data-full-src="${image.src}" alt="" decoding="async">
             </div>
             <div class="update-main-foreground">
-                <img class="update-main-img" src="${displaySrc}"${getUpdateResponsiveAttributes(image, "viewer")} data-full-src="${image.src}" data-image-index="${index}" alt="${image.alt}" decoding="async">
+                ${isVideo ? `
+                    <video
+                        class="update-main-video"
+                        src="${image.src}"
+                        poster="${escapeHtmlAttribute(image.posterSrc || previewSrc || "")}"
+                        data-image-index="${index}"
+                        controls
+                        playsinline
+                        preload="metadata"
+                    ></video>
+                ` : `
+                    <img class="update-main-img" src="${displaySrc}"${getUpdateResponsiveAttributes(image, "viewer")} data-full-src="${image.src}" data-image-index="${index}" alt="${escapeHtmlAttribute(image.alt || "")}" decoding="async">
+                `}
             </div>
             <span class="update-main-counter">${index + 1} / ${total}</span>
-        </button>
+        </div>
     `;
 }
 
@@ -647,38 +731,20 @@ function updateMainPhoto(images, index) {
         return;
     }
 
-    const mainBg = updatePanel.querySelector(".update-main-bg-image");
-    const mainImg = updatePanel.querySelector(".update-main-img");
-    const counter = updatePanel.querySelector(".update-main-counter");
+    const mainFrame = updatePanel.querySelector(".update-main-frame");
     const previewSrc = getUpdateImageDisplaySrc(image);
     const fullSrc = image.src;
+    const dayTitle = getText(getCurrentUpdate()?.title || "");
+    const isVideo = isVideoItem(image);
 
-    if (mainBg) {
-        mainBg.src = previewSrc;
-        if (image.viewerSrcSet) {
-            mainBg.srcset = image.viewerSrcSet;
-        }
-        mainBg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
-        mainBg.dataset.fullSrc = fullSrc;
+    updatePanel.querySelector(".update-main-video")?.pause();
+    if (mainFrame) {
+        mainFrame.outerHTML = buildUpdateStageMarkup(image, index, images.length, dayTitle, "update-main-frame");
+        bindUpdatePanelEvents();
     }
 
-    if (mainImg) {
-        mainImg.style.transition = "opacity 0.2s ease";
-        mainImg.src = previewSrc;
-        if (image.viewerSrcSet) {
-            mainImg.srcset = image.viewerSrcSet;
-        }
-        mainImg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
-        mainImg.dataset.fullSrc = fullSrc;
-        mainImg.dataset.imageIndex = String(index);
-        mainImg.alt = image.alt || "";
-        mainImg.style.opacity = "1";
-        mainImg.onload = null;
-    }
-
-    if (counter) {
-        counter.textContent = `${index + 1} / ${images.length}`;
-    }
+    const nextMainBg = updatePanel.querySelector(".update-main-bg-image");
+    const nextMainImg = updatePanel.querySelector(".update-main-img");
 
     updatePanel.querySelectorAll(".update-thumb-item").forEach((button) => {
         const isSelected = Number(button.dataset.imageIndex) === index;
@@ -690,26 +756,27 @@ function updateMainPhoto(images, index) {
         getCachedImageUrl(fullSrc).then((cachedUrl) => {
             image._cachedUrl = cachedUrl;
 
-            if (!mainImg || mainImg.dataset.imageIndex !== String(index)) {
+            if (!nextMainImg || nextMainImg.dataset.imageIndex !== String(index)) {
                 return;
             }
 
-            if (mainBg) {
-                mainBg.src = cachedUrl;
+            if (nextMainBg) {
+                nextMainBg.src = cachedUrl;
             }
 
-            mainImg.src = cachedUrl;
+            nextMainImg.src = cachedUrl;
         });
     };
 
-    if (previewSrc !== fullSrc) {
+    if (!isVideo && previewSrc !== fullSrc) {
         upgradeCurrentImage();
-    } else {
+    } else if (!isVideo) {
         getCachedImageUrl(fullSrc).then((cachedUrl) => {
             image._cachedUrl = cachedUrl;
         });
     }
 
+    syncUpdateSlideBackgrounds();
     scheduleSmartPreload(images, index);
 }
 
@@ -770,12 +837,15 @@ function appendNewUpdatePhotos(updateId, previousImages) {
     const isAppendOnly = previousImages.every((image, index) => {
         const nextImage = images[index];
         return nextImage
+            && (image.type || "image") === (nextImage.type || "image")
             && image.src === nextImage.src
             && (image.thumbSrc || "") === (nextImage.thumbSrc || "")
+            && (image.posterSrc || "") === (nextImage.posterSrc || "")
             && (image.name || "") === (nextImage.name || "")
             && (image.filename || "") === (nextImage.filename || "")
             && (image.alt || "") === (nextImage.alt || "")
-            && (image.createdTime || "") === (nextImage.createdTime || "");
+            && (image.createdTime || "") === (nextImage.createdTime || "")
+            && (image.mimeType || "") === (nextImage.mimeType || "");
     });
 
     if (!isAppendOnly) {
@@ -804,7 +874,7 @@ function appendNewUpdatePhotos(updateId, previousImages) {
     newPhotos.forEach((image, offset) => {
         const index = previousCount + offset;
         const button = document.createElement("button");
-        button.className = `update-thumb-item ${index === getSelectedUpdateImageIndex(updateId) ? "is-selected" : ""}`;
+        button.className = `update-thumb-item${isVideoItem(image) ? " is-video" : ""}${index === getSelectedUpdateImageIndex(updateId) ? " is-selected" : ""}`;
         button.type = "button";
         button.dataset.updateThumb = "true";
         button.dataset.imageIndex = String(index);
@@ -812,15 +882,29 @@ function appendNewUpdatePhotos(updateId, previousImages) {
         button.setAttribute("aria-pressed", String(index === getSelectedUpdateImageIndex(updateId)));
 
         const img = document.createElement("img");
-        img.src = image.thumbSrc || image.src;
-        if (image.thumbSrcSet) {
+        img.src = getUpdateThumbSrc(image);
+        if (!isVideoItem(image) && image.thumbSrcSet) {
             img.srcset = image.thumbSrcSet;
+            img.sizes = image.thumbSizes || UPDATE_THUMB_SIZES;
         }
-        img.sizes = image.thumbSizes || UPDATE_THUMB_SIZES;
         img.alt = image.alt || "";
         img.loading = "lazy";
         img.decoding = "async";
         button.appendChild(img);
+
+        if (isVideoItem(image)) {
+            const overlay = document.createElement("span");
+            overlay.className = "thumb-play-icon";
+            overlay.setAttribute("aria-hidden", "true");
+            overlay.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="none">
+                    <circle cx="12" cy="12" r="12" fill="rgba(0,0,0,0.5)"></circle>
+                    <polygon points="10,8 16,12 10,16" fill="white"></polygon>
+                </svg>
+            `;
+            button.appendChild(overlay);
+        }
+
         fragment.appendChild(button);
     });
 
@@ -892,18 +976,9 @@ function renderUpdatePanel() {
                     ${buildUpdateStageMarkup(selectedImage, selectedIndex, images.length, dayTitle, "update-main-frame")}
                 </div>
                 <div class="update-thumb-strip" id="updateThumbStrip" aria-label="${formatText(siteData.ui.updates.thumbStripAria, { title: dayTitle })}">
-                    ${images.map((image, index) => `
-                        <button
-                            class="update-thumb-item ${index === selectedIndex ? "is-selected" : ""}"
-                            type="button"
-                            data-update-thumb="true"
-                            data-image-index="${index}"
-                            aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
-                            aria-pressed="${index === selectedIndex ? "true" : "false"}"
-                        >
-                            <img src="${image.thumbSrc || image.src}"${getUpdateResponsiveAttributes(image, "thumb")} alt="${image.alt}" loading="lazy" decoding="async">
-                        </button>
-                    `).join("")}
+                    ${images.map((image, index) => buildUpdateThumbMarkup(image, index, dayTitle, {
+                        selected: index === selectedIndex
+                    })).join("")}
                 </div>
             ` : `
                 <div class="update-empty-state">
@@ -945,38 +1020,6 @@ function getUpdateGalleryStatus(updateId) {
     return getUpdateGalleryState(updateId).status;
 }
 
-function applyModalStageImage(modalBg, modalImg, image, index, { preferCached = false } = {}) {
-    const previewSrc = getUpdateImageDisplaySrc(image);
-    const cachedSrc = image._cachedUrl || "";
-    const displaySrc = preferCached && cachedSrc ? cachedSrc : previewSrc;
-    const useResponsiveSources = !preferCached || !cachedSrc;
-
-    if (modalBg) {
-        modalBg.src = displaySrc;
-        if (useResponsiveSources && image.viewerSrcSet) {
-            modalBg.srcset = image.viewerSrcSet;
-            modalBg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
-        } else {
-            modalBg.removeAttribute("srcset");
-            modalBg.removeAttribute("sizes");
-        }
-    }
-
-    if (modalImg) {
-        modalImg.src = displaySrc;
-        if (useResponsiveSources && image.viewerSrcSet) {
-            modalImg.srcset = image.viewerSrcSet;
-            modalImg.sizes = image.viewerSizes || UPDATE_VIEWER_SIZES;
-        } else {
-            modalImg.removeAttribute("srcset");
-            modalImg.removeAttribute("sizes");
-        }
-        modalImg.dataset.imageIndex = String(index);
-        modalImg.style.transition = "opacity 0.2s ease";
-        modalImg.style.opacity = "1";
-    }
-}
-
 function renderUpdateModal() {
     const day = getCurrentUpdate();
     if (!day || !updateModalStage || !updateModalThumbStrip) {
@@ -994,78 +1037,31 @@ function renderUpdateModal() {
 
     const selectedIndex = getSelectedUpdateImageIndex(day.id);
     const selectedImage = images[selectedIndex];
-    const previewSrc = getUpdateImageDisplaySrc(selectedImage);
-    const fullSrc = selectedImage.src;
-    const shouldRebuildStage = updateModalStage.dataset.updateDayId !== day.id
-        || updateModalStage.dataset.imageCount !== String(images.length)
-        || !updateModalStage.querySelector(".update-modal-main-frame");
+    updateModalStage.querySelector("video")?.pause();
+    updateModalStage.innerHTML = buildUpdateStageMarkup(
+        selectedImage,
+        selectedIndex,
+        images.length,
+        dayTitle,
+        "update-modal-main-frame",
+        { useCachedDisplay: Boolean(selectedImage._cachedUrl) }
+    );
+    updateModalStage.dataset.updateDayId = day.id;
+    updateModalStage.dataset.imageCount = String(images.length);
 
-    if (shouldRebuildStage) {
-        updateModalStage.innerHTML = buildUpdateStageMarkup(
-            selectedImage,
-            selectedIndex,
-            images.length,
-            dayTitle,
-            "update-modal-main-frame",
-            { useCachedDisplay: Boolean(selectedImage._cachedUrl) }
-        );
-        updateModalStage.dataset.updateDayId = day.id;
-        updateModalStage.dataset.imageCount = String(images.length);
-    }
-
-    const modalFrame = updateModalStage.querySelector(".update-modal-main-frame");
     const modalBg = updateModalStage.querySelector(".update-main-bg-image");
     const modalImg = updateModalStage.querySelector(".update-main-img");
-    const modalCounter = updateModalStage.querySelector(".update-main-counter");
-
-    if (modalFrame) {
-        modalFrame.setAttribute("aria-label", formatText(siteData.ui.updates.mainFrameAria, { title: dayTitle }));
-    }
-    if (modalCounter) {
-        modalCounter.textContent = `${selectedIndex + 1} / ${images.length}`;
-    }
-    if (modalImg) {
-        modalImg.alt = selectedImage.alt || "";
-    }
-
-    applyModalStageImage(modalBg, modalImg, selectedImage, selectedIndex, {
-        preferCached: Boolean(selectedImage._cachedUrl)
-    });
-
-    if (!selectedImage._cachedUrl && previewSrc !== fullSrc) {
-        getCachedImageUrl(fullSrc).then((cachedUrl) => {
-            selectedImage._cachedUrl = cachedUrl;
-
-            if (!modalImg || modalImg.dataset.imageIndex !== String(selectedIndex)) {
-                return;
-            }
-
-            window.requestAnimationFrame(() => {
-                applyModalStageImage(modalBg, modalImg, selectedImage, selectedIndex, {
-                    preferCached: true
-                });
-            });
-        });
-    }
 
     const activeIndex = selectedIndex;
-    const imageSignature = images.map((image) => `${image.src || ""}|${image.thumbSrc || ""}|${image.alt || ""}`).join("::");
+    const imageSignature = images.map((image) => `${image.type || "image"}|${image.src || ""}|${image.thumbSrc || ""}|${image.posterSrc || ""}|${image.alt || ""}`).join("::");
     const shouldRebuildStrip = updateModalThumbStrip.dataset.updateDayId !== day.id
         || updateModalThumbStrip.dataset.imageSignature !== imageSignature;
 
     if (shouldRebuildStrip) {
-        updateModalThumbStrip.innerHTML = images.map((image, index) => `
-            <button
-                class="update-thumb-item ${index === activeIndex ? "is-selected" : ""}"
-                type="button"
-                data-update-modal-thumb="true"
-                data-image-index="${index}"
-                aria-label="${formatText(siteData.ui.updates.thumbAria, { index: index + 1, title: dayTitle })}"
-                aria-pressed="${index === activeIndex ? "true" : "false"}"
-            >
-                <img src="${image.thumbSrc || image.src}"${getUpdateResponsiveAttributes(image, "thumb")} alt="${image.alt}" loading="lazy" decoding="async">
-            </button>
-        `).join("");
+        updateModalThumbStrip.innerHTML = images.map((image, index) => buildUpdateThumbMarkup(image, index, dayTitle, {
+            selected: index === activeIndex,
+            dataAttr: "data-update-modal-thumb"
+        })).join("");
         updateModalThumbStrip.dataset.updateDayId = day.id;
         updateModalThumbStrip.dataset.imageSignature = imageSignature;
     } else {
@@ -1077,6 +1073,23 @@ function renderUpdateModal() {
                 index: Number(button.dataset.imageIndex) + 1,
                 title: dayTitle
             }));
+        });
+    }
+
+    if (modalImg && !selectedImage._cachedUrl && !isVideoItem(selectedImage) && getUpdateImageDisplaySrc(selectedImage) !== selectedImage.src) {
+        getCachedImageUrl(selectedImage.src).then((cachedUrl) => {
+            selectedImage._cachedUrl = cachedUrl;
+
+            if (!modalImg || modalImg.dataset.imageIndex !== String(selectedIndex)) {
+                return;
+            }
+
+            window.requestAnimationFrame(() => {
+                if (modalBg) {
+                    modalBg.src = cachedUrl;
+                }
+                modalImg.src = cachedUrl;
+            });
         });
     }
 
@@ -1104,12 +1117,15 @@ function haveSameUpdateImages(previousImages, nextImages) {
     return previousImages.every((image, index) => {
         const nextImage = nextImages[index];
         return nextImage
+            && (image.type || "image") === (nextImage.type || "image")
             && image.src === nextImage.src
             && (image.thumbSrc || "") === (nextImage.thumbSrc || "")
+            && (image.posterSrc || "") === (nextImage.posterSrc || "")
             && (image.name || "") === (nextImage.name || "")
             && (image.filename || "") === (nextImage.filename || "")
             && (image.alt || "") === (nextImage.alt || "")
-            && (image.createdTime || "") === (nextImage.createdTime || "");
+            && (image.createdTime || "") === (nextImage.createdTime || "")
+            && (image.mimeType || "") === (nextImage.mimeType || "");
     });
 }
 
@@ -1136,7 +1152,7 @@ async function fetchUpdateImages(updateId, { force = false } = {}) {
         const timeBucket = getUpdateTimeBucket();
         const cachedSession = !force ? readUpdateSessionCache(updateId, query, timeBucket) : null;
         if (cachedSession) {
-            const cachedImages = cachedSession.images;
+            const cachedImages = Array.isArray(cachedSession.items) ? cachedSession.items : [];
             const didImagesChange = !haveSameUpdateImages(previousImages, cachedImages);
             state.images = didImagesChange ? cachedImages : previousImages;
             state.status = "ready";
@@ -1167,7 +1183,11 @@ async function fetchUpdateImages(updateId, { force = false } = {}) {
         }
 
         const payload = await response.json();
-        const raw = Array.isArray(payload.images) ? payload.images : [];
+        const raw = Array.isArray(payload.items)
+            ? payload.items
+            : Array.isArray(payload.images)
+                ? payload.images
+                : [];
         const nextImages = raw.slice().sort((a, b) => {
             if (a.createdTime && b.createdTime) {
                 return new Date(a.createdTime) - new Date(b.createdTime);
@@ -1590,8 +1610,27 @@ function updateLightbox() {
         return;
     }
 
-    lightboxImage.src = item.src;
-    lightboxImage.alt = item.alt;
+    if (isVideoItem(item)) {
+        lightboxMedia.innerHTML = `
+            <video
+                id="lightboxVideo"
+                src="${item.src}"
+                poster="${escapeHtmlAttribute(item.posterSrc || "")}"
+                controls
+                playsinline
+                autoplay
+                preload="metadata"
+            ></video>
+        `;
+    } else {
+        lightboxMedia.innerHTML = `
+            <img
+                id="lightboxImage"
+                src="${item.src}"
+                alt="${escapeHtmlAttribute(item.alt || "")}"
+            >
+        `;
+    }
     lightboxMeta.textContent = formatText(siteData.ui.lightbox.counter, {
         current: lightboxIndex + 1,
         total: lightboxItems.length,
@@ -1606,6 +1645,7 @@ function updateLightbox() {
 }
 
 function closeLightbox() {
+    lightboxMedia?.querySelector("video")?.pause();
     lightbox.classList.remove("is-open");
     lightbox.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
@@ -1618,6 +1658,7 @@ function moveLightbox(direction) {
         return;
     }
 
+    lightboxMedia?.querySelector("video")?.pause();
     lightboxIndex = (lightboxIndex + direction + lightboxItems.length) % lightboxItems.length;
     updateLightbox();
 }
@@ -1639,6 +1680,8 @@ function openUpdateModal() {
         return;
     }
 
+    updatePanel.querySelector(".update-main-video")?.pause();
+
     const mainStrip = document.getElementById("updateThumbStrip");
     if (mainStrip) {
         rememberUpdateThumbStripScroll(currentUpdateId, mainStrip.scrollLeft);
@@ -1652,6 +1695,7 @@ function openUpdateModal() {
 }
 
 function closeUpdateModal() {
+    updateModalStage?.querySelector("video")?.pause();
     updateModalOpen = false;
     updateModal.classList.remove("is-open");
     updateModal.setAttribute("aria-hidden", "true");
@@ -1674,10 +1718,10 @@ function closeUpdateModal() {
 }
 
 function syncUpdatePanelSelection(images, index) {
-    const mainImg = updatePanel.querySelector(".update-main-img");
+    const mainFrame = updatePanel.querySelector(".update-main-frame");
     const thumbStrip = document.getElementById("updateThumbStrip");
 
-    if (!mainImg || !thumbStrip) {
+    if (!mainFrame || !thumbStrip) {
         return;
     }
 
@@ -1688,7 +1732,31 @@ function bindUpdatePanelEvents() {
     const mainFrame = document.querySelector(".update-main-frame");
     const thumbStrip = document.getElementById("updateThumbStrip");
 
-    mainFrame?.addEventListener("click", openUpdateModal);
+    if (mainFrame && mainFrame.dataset.boundClick !== "true") {
+        mainFrame.dataset.boundClick = "true";
+        mainFrame.addEventListener("click", (event) => {
+            if (event.target instanceof Element && event.target.closest("video")) {
+                return;
+            }
+
+            openUpdateModal();
+        });
+    }
+    if (mainFrame && mainFrame.dataset.boundKeydown !== "true") {
+        mainFrame.dataset.boundKeydown = "true";
+        mainFrame.addEventListener("keydown", (event) => {
+            if (mainFrame.dataset.mediaType === "video") {
+                return;
+            }
+
+            if (event.key !== "Enter" && event.key !== " ") {
+                return;
+            }
+
+            event.preventDefault();
+            openUpdateModal();
+        });
+    }
     if (thumbStrip && thumbStrip.dataset.boundScroll !== "true") {
         thumbStrip.dataset.boundScroll = "true";
         thumbStrip.addEventListener("scroll", () => {

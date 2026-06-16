@@ -4,6 +4,7 @@ const ENTRY_RE = /<div class="flip-entry"[\s\S]*?<a href="([^"]+)"[\s\S]*?<img s
 const GOOGLE_PHOTOS_IMAGE_RE = /https:\/\/lh3\.googleusercontent\.com\/pw\/[^"'\\\s<>)]+/g;
 const VIEWER_SIZES = "(max-width: 768px) 92vw, (max-width: 1200px) 86vw, 1200px";
 const THUMB_SIZES = "(max-width: 768px) 96px, 112px";
+const VIDEO_FILE_EXT_RE = /\.(mp4|mov|avi|mkv|webm|3gp)$/i;
 
 function decodeHtml(value) {
     return String(value || "")
@@ -42,6 +43,20 @@ function buildDriveImageVariants(fileId) {
     };
 }
 
+function buildDriveVideoVariants(fileId, posterSrc = "") {
+    const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+    return {
+        src: directUrl,
+        displaySrc: posterSrc,
+        thumbSrc: null,
+        viewerSrcSet: "",
+        viewerSizes: VIEWER_SIZES,
+        thumbSrcSet: "",
+        thumbSizes: THUMB_SIZES
+    };
+}
+
 function buildGooglePhotoImageVariants(baseUrl) {
     const viewerUrl = (width) => `${baseUrl}=w${width}`;
     const thumbUrl = (width) => `${baseUrl}=w${width}-h${Math.round(width * 0.75)}-p-k-no`;
@@ -57,8 +72,8 @@ function buildGooglePhotoImageVariants(baseUrl) {
     };
 }
 
-function extractImages(html) {
-    const images = [];
+function extractItems(html) {
+    const items = [];
     const matches = html.matchAll(ENTRY_RE);
 
     for (const match of matches) {
@@ -73,29 +88,38 @@ function extractImages(html) {
         }
 
         const caption = toCaption(title);
-        const variants = buildDriveImageVariants(fileId);
-        images.push({
+        const isVideo = VIDEO_FILE_EXT_RE.test(title);
+        const imageVariants = buildDriveImageVariants(fileId);
+        const posterSrc = thumbSrc || imageVariants.thumbSrc || imageVariants.displaySrc || imageVariants.src;
+        const variants = isVideo
+            ? buildDriveVideoVariants(fileId, posterSrc)
+            : imageVariants;
+
+        items.push({
             ...variants,
-            thumbSrc: thumbSrc || variants.thumbSrc,
+            type: isVideo ? "video" : "image",
+            thumbSrc: isVideo ? null : (thumbSrc || variants.thumbSrc),
+            posterSrc: isVideo ? posterSrc : null,
             name: title,
             filename: title,
             createdTime: null,
+            mimeType: null,
             alt: caption || alt || "Funeral day photo",
             caption: caption || "Shared from the funeral day folder."
         });
     }
 
-    return images;
+    return items;
 }
 
 function normalizeGooglePhotoUrl(url) {
     return String(url || "").replace(/=([a-z0-9-]+)$/i, "");
 }
 
-function extractAlbumImages(html) {
+function extractAlbumItems(html) {
     const rawUrls = html.match(GOOGLE_PHOTOS_IMAGE_RE) || [];
     const seen = new Set();
-    const images = [];
+    const items = [];
 
     for (const rawUrl of rawUrls) {
         const baseUrl = normalizeGooglePhotoUrl(decodeHtml(rawUrl));
@@ -105,17 +129,20 @@ function extractAlbumImages(html) {
         }
 
         seen.add(baseUrl);
-        images.push({
+        items.push({
             ...buildGooglePhotoImageVariants(baseUrl),
+            type: "image",
+            posterSrc: null,
             name: "",
             filename: "",
             createdTime: null,
+            mimeType: null,
             alt: "Vietnam memorial photo",
             caption: "Shared from the Vietnam memorial album."
         });
     }
 
-    return images;
+    return items;
 }
 
 async function fetchFolderHtml(folderId) {
@@ -158,12 +185,12 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const images = albumUrl
-            ? extractAlbumImages(await fetchAlbumHtml(albumUrl))
-            : extractImages(await fetchFolderHtml(folderId));
+        const items = albumUrl
+            ? extractAlbumItems(await fetchAlbumHtml(albumUrl))
+            : extractItems(await fetchFolderHtml(folderId));
 
         res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60, stale-while-revalidate=300");
-        res.status(200).json({ images });
+        res.status(200).json({ items });
     } catch (error) {
         res.status(502).json({
             error: albumUrl
