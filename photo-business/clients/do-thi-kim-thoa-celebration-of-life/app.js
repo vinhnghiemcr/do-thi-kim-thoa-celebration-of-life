@@ -739,7 +739,12 @@ function updateMainPhoto(images, index) {
 
     updatePanel.querySelector(".update-main-video")?.pause();
     if (mainFrame) {
-        mainFrame.outerHTML = buildUpdateStageMarkup(image, index, images.length, dayTitle, "update-main-frame");
+        const temp = document.createElement("div");
+        temp.innerHTML = buildUpdateStageMarkup(image, index, images.length, dayTitle, "update-main-frame");
+        const newFrame = temp.firstElementChild;
+        if (newFrame) {
+            mainFrame.replaceWith(newFrame);
+        }
         bindUpdatePanelEvents();
     }
 

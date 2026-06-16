@@ -2,6 +2,7 @@ const DRIVE_FOLDER_URL = "https://drive.google.com/embeddedfolderview";
 const DRIVE_FILE_URL_RE = /\/file\/d\/([A-Za-z0-9_-]+)/;
 const ENTRY_RE = /<div class="flip-entry"[\s\S]*?<a href="([^"]+)"[\s\S]*?<img src="([^"]+)" alt="([^"]*)"[\s\S]*?<div class="flip-entry-title">([\s\S]*?)<\/div>/g;
 const GOOGLE_PHOTOS_IMAGE_RE = /https:\/\/lh3\.googleusercontent\.com\/pw\/[^"'\\\s<>)]+/g;
+const GOOGLE_PHOTOS_VIDEO_RE = /https:\/\/lh3\.googleusercontent\.com\/pw\/[^"'\\\s<>)]+(?:=m37|=m18|\/mp4)[^"'\\\s<>)]*/g;
 const VIEWER_SIZES = "(max-width: 768px) 92vw, (max-width: 1200px) 86vw, 1200px";
 const THUMB_SIZES = "(max-width: 768px) 96px, 112px";
 const VIDEO_FILE_EXT_RE = /\.(mp4|mov|avi|mkv|webm|3gp)$/i;
@@ -44,7 +45,7 @@ function buildDriveImageVariants(fileId) {
 }
 
 function buildDriveVideoVariants(fileId, posterSrc = "") {
-    const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const directUrl = `https://drive.google.com/uc?id=${fileId}`;
 
     return {
         src: directUrl,
@@ -138,6 +139,70 @@ function extractAlbumItems(html) {
             createdTime: null,
             mimeType: null,
             alt: "Vietnam memorial photo",
+            caption: "Shared from the Vietnam memorial album."
+        });
+    }
+
+    // Also scan for video entries. Google Photos pages can embed a "VIDEO"
+    // marker near media URLs, and `m37` is the most common playable MP4 form.
+    const videoMarkerRe = /"VIDEO"[\s\S]{0,500}?(https:\/\/lh3\.googleusercontent\.com\/pw\/[^"'\\\s<>)]+)/g;
+    let videoMatch;
+
+    while ((videoMatch = videoMarkerRe.exec(html)) !== null) {
+        const baseUrl = normalizeGooglePhotoUrl(decodeHtml(videoMatch[1]));
+
+        if (!baseUrl || seen.has(baseUrl)) {
+            continue;
+        }
+
+        seen.add(baseUrl);
+        items.push({
+            src: `${baseUrl}=m37`,
+            displaySrc: `${baseUrl}=w1280`,
+            thumbSrc: `${baseUrl}=w320-h240-p-k-no`,
+            posterSrc: `${baseUrl}=w640`,
+            viewerSrcSet: "",
+            viewerSizes: VIEWER_SIZES,
+            thumbSrcSet: "",
+            thumbSizes: THUMB_SIZES,
+            type: "video",
+            name: "",
+            filename: "",
+            createdTime: null,
+            mimeType: "video/mp4",
+            alt: "Vietnam memorial video",
+            caption: "Shared from the Vietnam memorial album."
+        });
+    }
+
+    // Fallback: if Google Photos already exposes direct video-form URLs in the
+    // HTML, capture them even without a nearby "VIDEO" marker.
+    const directVideoUrls = html.match(GOOGLE_PHOTOS_VIDEO_RE) || [];
+
+    for (const rawVideoUrl of directVideoUrls) {
+        const videoUrl = decodeHtml(rawVideoUrl);
+        const baseUrl = normalizeGooglePhotoUrl(videoUrl);
+
+        if (!baseUrl || seen.has(baseUrl)) {
+            continue;
+        }
+
+        seen.add(baseUrl);
+        items.push({
+            src: `${baseUrl}=m37`,
+            displaySrc: `${baseUrl}=w1280`,
+            thumbSrc: `${baseUrl}=w320-h240-p-k-no`,
+            posterSrc: `${baseUrl}=w640`,
+            viewerSrcSet: "",
+            viewerSizes: VIEWER_SIZES,
+            thumbSrcSet: "",
+            thumbSizes: THUMB_SIZES,
+            type: "video",
+            name: "",
+            filename: "",
+            createdTime: null,
+            mimeType: "video/mp4",
+            alt: "Vietnam memorial video",
             caption: "Shared from the Vietnam memorial album."
         });
     }
